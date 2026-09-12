@@ -17,6 +17,74 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- dashboard/Space "size-up" review (direct
+  request, worked through an HTML mockup first before touching real code:
+  layout/data-density pass, no new features). Two changes:
+
+  1. **Page banner title moved back onto the photo.** The 2026-09-07
+     Notion-style rework put the title below the cover in
+     `.page-banner-header-row` specifically to avoid a readability-scrim
+     requirement. Reverted (direct request) -- title + avatar now live in
+     `.page-banner-overlay`, bottom-left, INSIDE `.page-banner` again, but
+     with a full-row scrim (`.page-banner::after`, 60% height, was 35%)
+     instead of the old thin one, and the title is forced to one line
+     (ellipsis) so it can never grow taller than the avatar next to it.
+     Action buttons moved from bottom-right to top-right of the photo so
+     an edit-mode button cluster can never collide with the title
+     regardless of its length. `.page-banner-header-row` is gone.
+     Gradient-only scrim, not a solid text-backing chip -- accepted risk
+     that a very busy/edge-to-edge photo can still fight the white title
+     text; not yet checked against real (non-gradient-placeholder) banner
+     images. Edit-mode gating of the action buttons is unchanged (still
+     entirely the caller templates' own `{% if edit_mode %}`, never
+     `_page_banner.html`'s concern) -- confirmed via direct code reading
+     before touching anything, not assumed.
+
+  2. **Default Home/Space widget seed cleaned up.** The seeded Stack
+     widget had 3 members (At a glance / Upcoming events / a 3rd Agenda
+     pane showing overdue+tasks+events) -- that 3rd member, added
+     2026-09-03 to fix a "Nothing to show" bug, ended up duplicating the
+     standalone Today's Agenda widget beside it almost exactly (same
+     range="today", same effective show list). Dropped outright rather
+     than re-fixed. Seeded widgets also got explicit titles ("Today" /
+     "At a glance" / "Upcoming") instead of falling back to the generic
+     "Agenda" spec label three separate times on a fresh install.
+     **Existing installs are untouched** (one-time app_meta seed flag,
+     direct request not to migrate) -- only brand-new Home/Space pages
+     get the new 2-member/titled shape.
+
+  Explicitly out of scope this round (asked, deferred): banner subtitle
+  content (date under Home's greeting, "N projects · M open tasks" under
+  a Space name) -- the date is trivial to add later, but a Space-wide
+  task/project rollup doesn't exist anywhere yet (only per-project counts
+  do, see routers/dashboard.py:638-645) and needs its own slice. A
+  per-widget "hide on mobile" toggle was discussed and explicitly NOT
+  adopted -- flagged as a real feature (new config field + a widget
+  silently disappearing on mobile with no on-screen trace) with no
+  concrete use case yet, not a layout tweak.
+
+  **Tests**: updated `tests/test_banners.py`
+  (`TestPageBannerOnPhotoOverlay`, was `TestPageBannerNotionStyleHeaderRow`),
+  `tests/test_dashboard_router.py` (seed counts 5→4, member types/titles,
+  `.widget-content` count 4→3), `tests/test_dashboard_usability_rework.py`
+  (`_DEFAULT_LAYOUT_TYPE_ORDER`/new `_DEFAULT_LAYOUT_TITLES`,
+  `TestDefaultSeedIncludesNewWidgets` rewritten to check the standalone
+  Today widget's default show behavior instead of a stored config value
+  that no longer exists). Full suite re-verified in 4 batches under
+  `TZ=UTC` (`test_[a-f]*`, `test_[g-o]*`, `test_[p-s]*`, `test_[t-z]*`) --
+  **2199 passed, 0 failed**. Note: 4 unrelated tests
+  (`TestAgendaWidgetAllUpcoming::test_todays_earlier_events_still_count_as_upcoming`
+  and 3 in `test_project_detail.py`) fail under the sandbox's local
+  (non-UTC) clock -- pre-existing local-`date.today()`-vs-UTC-built-
+  timestamp flakiness, confirmed unrelated to this session's change by
+  reproducing before touching any code; not fixed here, worth its own
+  slice.
+
+  **Next slice**: (a) if wanted, add the deferred banner subtitle content
+  (Home date is trivial; Space project/task rollup needs new aggregation
+  code) -- or (b) the `TZ`-dependent test flakiness above -- or pick the
+  next roadmap slice per the normal session workflow below.
+
 - **Shipped:** 2026-09-12 -- same-day follow-up on the search-overlay
   focus-ring fix directly below, direct feedback: "command-palette-
   filters should have padding both top and bottom." `.command-palette-

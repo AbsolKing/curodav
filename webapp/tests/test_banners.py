@@ -261,54 +261,59 @@ class TestPageBannerAvatar:
         assert 'class="page-banner-avatar-wrap"' in body
 
 
-class TestPageBannerNotionStyleHeaderRow:
+class TestPageBannerOnPhotoOverlay:
     """2026-09-07 rework (direct report: "the avatar and text for the big
-    banner is a bit off... remake it Notion-like") -- the title used to be
-    white overlay text pinned right next to the avatar on the cover photo
-    itself; it now renders below the cover in a normal-colored
-    `.page-banner-header-row`, and the edit-mode action buttons became a
-    real child of `.page-banner` (floating over the photo) instead of a
-    sibling anchored to the whole `.page-banner-wrap`. See
-    _page_banner.html's `page_banner()` macro and style.css's own
-    `.page-banner-header-row` comment for the full rationale."""
+    banner is a bit off... remake it Notion-like") moved the title below
+    the cover into `.page-banner-header-row`, off the photo entirely.
 
-    def test_title_renders_inside_the_header_row_below_the_cover_not_on_it(self, conn):
+    2026-09-13 reverted (direct request, dashboard size-up review): the
+    title + avatar are back inside `.page-banner` itself, in
+    `.page-banner-overlay`, bottom-left on the photo -- with a full-row
+    scrim now, not the old thin under-buttons one -- and the action
+    buttons moved to the cover's top-right corner so they can't collide
+    with the title regardless of its length. See _page_banner.html's
+    `page_banner()` macro and style.css's own `.page-banner-overlay`
+    comment for the full rationale."""
+
+    def test_title_renders_inside_the_cover_on_the_photo(self, conn):
         _set_remote(conn, cached=True, scope="")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
-        assert '<div class="page-banner-header-row">' in body
-        # The header row (avatar + title) comes after .page-banner's own
-        # closing tag, not nested inside it -- title is below the cover,
-        # not overlaid on it.
-        cover_end = body.index("</div>", body.index('class="page-banner"'))
-        row_start = body.index('class="page-banner-header-row"')
+        assert '<div class="page-banner-overlay">' in body
+        # The overlay (avatar + title) comes after .page-banner's own
+        # opening tag and before the content that follows the whole banner
+        # -- nested inside it, i.e. on the photo, not in a separate block
+        # below it (there's no more .page-banner-header-row at all now).
+        assert "page-banner-header-row" not in body
+        cover_start = body.index('class="page-banner"')
+        overlay_start = body.index('class="page-banner-overlay"')
         title_start = body.index('class="page-banner-title"')
-        assert cover_end < row_start < title_start
+        after_banner = body.index('class="main-shell-body"')
+        assert cover_start < overlay_start < title_start < after_banner
 
-    def test_avatar_still_comes_before_the_title_in_the_header_row(self, conn):
+    def test_avatar_still_comes_before_the_title_in_the_overlay(self, conn):
         _set_remote(conn, cached=True, scope="")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
         avatar_start = body.index('class="page-banner-avatar-wrap"')
         title_start = body.index('class="page-banner-title"')
         assert avatar_start < title_start
 
-    def test_edit_mode_actions_are_nested_inside_the_cover_not_the_header_row(self, conn):
+    def test_edit_mode_actions_are_nested_inside_the_cover_before_the_overlay(self, conn):
         _set_remote(conn, cached=True, scope="")
         db.set_app_meta(conn, deps.EDIT_MODE_KEY, "1")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
         cover_start = body.index('class="page-banner"')
-        cover_end = body.index("</div>", body.index('class="page-banner-actions"'))
         actions_start = body.index('class="page-banner-actions"')
-        header_row_start = body.index('class="page-banner-header-row"')
-        # Actions sit between the cover's own opening tag and the header
-        # row that follows -- i.e. still inside .page-banner, not moved
-        # down alongside the avatar/title.
-        assert cover_start < actions_start < header_row_start
+        overlay_start = body.index('class="page-banner-overlay"')
+        # Both the (top-right) actions and the (bottom-left) overlay are
+        # markup children of .page-banner, actions rendered first -- neither
+        # moved outside the cover.
+        assert cover_start < actions_start < overlay_start
 
-    def test_project_page_gets_the_same_header_row(self, conn):
+    def test_project_page_gets_the_same_overlay(self, conn):
         db.upsert_label_config(conn, {"name": "Garden", "is_project": 1, "start_date": "2026-01-01", "end_date": "2026-12-31", "created_at": _now()})
         _set_remote(conn, cached=True, scope=deps.PAGE_HEADER_BANNER_SCOPE)
         body = projects_router.project_detail("Garden", _request("/projects/Garden"), conn=conn).body.decode()
-        assert '<div class="page-banner-header-row">' in body
+        assert '<div class="page-banner-overlay">' in body
 
 
 class TestPageBannerDefaultFallback:

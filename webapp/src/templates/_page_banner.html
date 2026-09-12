@@ -21,20 +21,30 @@
        display name, for the avatar overlap.
 
    2026-09-07 rework (direct report: "the avatar and text for the big
-   banner is a bit off... remake it Notion-like") -- until now the page's
-   title (`.page-banner-title`) rendered as white overlay text pinned to
-   the bottom-left of the cover photo itself, right next to the avatar,
-   which crowded both together against whatever the photo's own bottom-
-   left content happened to be (only really visible once every page got a
-   real default banner image -- see this same day's earlier "first-run
-   defaults" slice; before that most pages were bannerless and used the
-   plain top-bar title instead, so this never got much real-image
-   scrutiny). Rebuilt on Notion's own page-cover convention instead: the
-   icon/avatar still straddles the cover's bottom edge (half over the
-   photo, half below it -- unchanged), but the title now sits entirely
-   BELOW the cover, in the page's normal text color, on the same row as
-   the avatar's own lower half -- never competing with the photo's own
-   content or needing a readability scrim to stay legible.
+   banner is a bit off... remake it Notion-like") moved the title
+   (`.page-banner-title`) below the cover photo, on the same row as the
+   avatar's lower half, specifically so it would never compete with the
+   photo's own bottom-left content or need a readability scrim.
+
+   2026-09-13 reverted back onto the photo (direct request, dashboard
+   size-up review) -- the below-cover row added a second, separate block
+   of vertical space under every banner just to hold a title+subtitle that
+   read fine sitting on the image itself once contrast was handled
+   properly. Title + avatar are back in a `.page-banner-overlay` INSIDE
+   `.page-banner`, bottom-left, but unlike the pre-2026-09-07 version this
+   scrim (`.page-banner::after`, style.css) is now sized to cover the
+   whole overlay row, not just a thin strip under the action buttons --
+   and the overlay row itself is pinned to the avatar's own height with
+   `.page-banner-title` forced to one line (ellipsis, no wrap), so the
+   text can never grow past the icon regardless of title length. This
+   doesn't fully solve contrast against every possible photo -- a busy,
+   edge-to-edge image can still fight with white text even under a fixed
+   scrim -- accepted as a starting point rather than adding a solid
+   text-backing chip, which read too much like a UI overlay and not
+   enough like a photo caption. Action buttons moved from bottom-right to
+   top-right of the photo in this same change, so an edit-mode button
+   cluster can never collide with the now-bottom-left title regardless of
+   title length or how many buttons are showing.
 
    Converted to a `{% call %}` macro (same pattern _page_header_narrow.html
    already established for "let the includer inject page-specific actions
@@ -50,7 +60,10 @@
    The action buttons (New widget / Add-Change banner / Reset layout,
    page-specific and edit-mode-gated) are still each caller's own
    responsibility, supplied via the `{% call %}` block -- this macro only
-   decides where that content is placed, never what's in it. #}
+   decides where that content is placed, never what's in it -- the
+   edit-mode gating itself lives entirely in the caller templates
+   (dashboard.html / label_detail.html / project_detail.html), unchanged
+   by this rework. #}
 {% macro page_banner(title_html) %}
 {% if banner %}
 <div class="page-banner">
@@ -80,31 +93,34 @@
        scripting is enabled). #}
     <noscript><style nonce="{{ csp_nonce() }}">.page-banner img{opacity:1;}</style></noscript>
     {# Page actions (New widget / Add-Change banner / Reset layout) are a
-       real child of .page-banner now (2026-09-07), not a sibling anchored
-       to the whole .page-banner-wrap -- .page-banner-wrap's own height now
-       includes the header row below the photo too, so anchoring to ITS
-       bottom edge would drift the buttons down onto the header row instead
-       of staying pinned to the photo's own bottom-right corner. #}
+       real child of .page-banner, top-right corner (2026-09-13 -- moved up
+       from bottom-right so they can never land on the same row as the
+       title overlay below, whatever its length). Edit-mode gating is
+       entirely the caller's own responsibility (see this macro's own
+       comment above) -- this file never checks edit_mode itself. #}
     {% if caller %}
     <div class="page-banner-actions">{{ caller() }}</div>
     {% endif %}
-</div>
-<div class="page-banner-header-row">
-    {# 2026-08-29 (direct request: "better cache these images") -- photo_url
+    {# Title overlay -- bottom-left, on the photo itself (2026-09-13).
+       2026-08-29 (direct request: "better cache these images") -- photo_url
        (routers/settings.py's profile_photo_image) over inlining photo_b64 --
        see deps.py's avatar() own comment. This is the one avatar spot that
        used to matter most for this: it renders on every dashboard/label/
        Space/Project page, so the old inline data: URI repeated the full
        photo's bytes in every one of those pages' HTML. #}
-    <div class="page-banner-avatar-wrap">
-        {{ avatar({'photo_url': '/settings/profile-photo/image?v=' ~ profile_photo.version if profile_photo else None, 'photo_b64': profile_photo.photo_b64 if profile_photo else None, 'photo_type': profile_photo.photo_type if profile_photo else None, 'full_name': (display_name or 'U')}, 'avatar-hero') }}
+    <div class="page-banner-overlay">
+        <div class="page-banner-avatar-wrap">
+            {{ avatar({'photo_url': '/settings/profile-photo/image?v=' ~ profile_photo.version if profile_photo else None, 'photo_b64': profile_photo.photo_b64 if profile_photo else None, 'photo_type': profile_photo.photo_type if profile_photo else None, 'full_name': (display_name or 'U')}, 'avatar-hero') }}
+        </div>
+        <h1 class="page-banner-title">{{ title_html }}</h1>
     </div>
-    <h1 class="page-banner-title">{{ title_html }}</h1>
 </div>
 {% else %}
 {# Bannerless page (only when even the Settings > Appearance default is
    unset): the plain top-bar layout this app always had -- title flexed
-   left, actions right, no cover/avatar to make room for. #}
+   left, actions right, no cover/avatar to make room for. Unchanged by the
+   2026-09-13 rework -- there's no photo here for the title to sit on or
+   off of. #}
 <div class="page-banner-actions">
     <h1 class="page-banner-title-plain">{{ title_html }}</h1>
     {% if caller %}{{ caller() }}{% endif %}
