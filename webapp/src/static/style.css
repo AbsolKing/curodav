@@ -5561,7 +5561,15 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    row, .project-preview-row: no separators, a plain hover tint). font-size
    drops one notch to --text-footnote (14px, was --text-callout's 15.5px)
    to match the compact scale the rest of a widget's body already uses
-   (.widget-section-label, stat captions). */
+   (.widget-section-label, stat captions).
+
+   2026-09-13: reconsidered and reaffirmed, not just left alone by
+   default -- a dashboard size-up mockup's dense list style used exactly
+   this kind of bottom-border row divider, and it was a direct, deliberate
+   call to leave that part out of the real app while still adopting other
+   pieces of the same mockup (see `.at-a-glance-stat`'s own 2026-09-13
+   comment) specifically because of the "archaic" feedback this comment
+   already documents. */
 .widget-content table{font-size:var(--text-footnote);}
 .widget-content tbody tr{border-bottom:none;}
 .widget-content tbody td{padding:7px 4px;}
@@ -5675,14 +5683,26 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    rework 2026-08-07) -- a row of number+label stat blocks, each a link to
    the matching filtered Tasks view. Reuses .widget-section-label for the
    small caption under each number rather than inventing a new label
-   style. */
-.at-a-glance-row{display:flex; gap:var(--space-4); flex-wrap:wrap;}
+   style.
+
+   2026-09-13 (direct request, "steal the way information is displayed
+   and styled from the [dashboard size-up] mockup") -- each stat now has
+   its own permanently-visible tinted block instead of only tinting on
+   hover, matching the mockup's look: a stat reads as a distinct block at
+   a glance, not plain text that happens to highlight when your cursor
+   passes over it. NOT paired with the mockup's other density cue (bottom-
+   border row dividers on Agenda/Upcoming lists) -- direct decision to
+   leave those out, since this codebase already has a dated, deliberate
+   decision to remove exactly that kind of row divider after direct
+   feedback called them "archaic"/spreadsheet-like (see
+   `.widget-content tbody tr` below). */
+.at-a-glance-row{display:flex; gap:var(--space-3); flex-wrap:wrap;}
 .at-a-glance-stat{
   flex:1; text-align:center; text-decoration:none; color:inherit;
-  padding:var(--space-2); border-radius:var(--radius-md);
-  min-width:0;
+  padding:var(--space-3) var(--space-2); border-radius:var(--radius-lg);
+  min-width:0; background:var(--bg-secondary);
 }
-.at-a-glance-stat:hover{background:var(--bg-secondary); text-decoration:none;}
+.at-a-glance-stat:hover{background:var(--bg-tertiary); text-decoration:none;}
 .at-a-glance-number{font-size:28px; font-weight:600; line-height:1.1;}
 .at-a-glance-number.is-overdue{color:var(--danger);}
 /* 2026-08-07: at third/half width there isn't room for all three stats at
@@ -6336,10 +6356,9 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    width 3:1 reads right), widening to 5:1 on ≥721px so a full-width
    desktop banner (~1120px) stays a slim ~224px header instead of a
    ~373px tower. The edit-mode toggle ("Done"/"Edit mode") sits in the
-   banner's top-right overlay (2026-09-13, moved up from bottom-right --
-   see .page-banner-overlay's own comment below; _page_banner.html); the
-   "Add/Change banner" button lives in the page toolbar next to "New
-   widget" (dashboard.html / label_detail.html). */
+   banner's bottom-right overlay (_page_banner.html); the "Add/Change
+   banner" button lives in the page toolbar next to "New widget"
+   (dashboard.html / label_detail.html). */
 .page-banner{
   width:100%; aspect-ratio:3 / 1; overflow:hidden; position:relative;
   border-radius:var(--radius-card);
@@ -6349,81 +6368,109 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
   .page-banner{aspect-ratio:5 / 1;}
 }
 /* 2026-09-13 bug fix: was the bare descendant selector `.page-banner img`,
-   which matched ANY <img> inside .page-banner -- harmless while the
-   avatar lived below the cover (outside .page-banner entirely), but once
-   this same session's title-overlay rework moved the avatar's own <img>
-   (uploaded-photo case) inside .page-banner too, this rule started
-   matching it as well and stretched it to the cover's own 100%/100% --
-   direct bug report ("the avatar is too big") was exactly this. Scoped to
-   a dedicated `.page-banner-cover` class (set in _page_banner.html) so
-   only the actual cover photo is ever affected, regardless of what else
-   gets nested in .page-banner in the future. */
+   which matches ANY <img> inside .page-banner. Harmless here (the avatar
+   lives below the cover, outside .page-banner entirely -- see
+   .page-banner-header-row below), but a same-day on-photo experiment
+   briefly nested the avatar inside .page-banner too and this selector
+   caught it, stretching a 44px avatar to the cover's own 100%/100% --
+   direct bug report ("the avatar is too big"). Kept scoped to this
+   dedicated class even after reverting the avatar back outside
+   .page-banner, since it makes that whole class of bug impossible
+   regardless of what else ever ends up nested in here. */
 .page-banner-cover{
   width:100%; height:100%; object-fit:cover; display:block;
 }
 .page-banner-wrap{position:relative;}
-/* 2026-09-07 rework moved the title below the cover photo, in a separate
-   `.page-banner-header-row`, specifically to get it off the image and
-   away from any readability-scrim requirement.
+/* 2026-09-07 rework (direct report: "the avatar and text for the big
+   banner is a bit off... remake it Notion-like") -- the title used to be
+   white overlay text pinned to the cover's own bottom-left, right next to
+   the avatar, needing a permanent readability scrim (`.page-banner::after`
+   below) to stay legible over an arbitrary photo. Replaced with Notion's
+   own page-cover convention: the avatar still straddles the cover's
+   bottom edge (half over the photo, half below -- unchanged), but the
+   title now renders entirely below the cover in `.page-banner-header-row`,
+   in the page's normal text color, so it never has to compete with
+   whatever the photo's own bottom-left content happens to be.
 
-   2026-09-13 reverted back onto the photo (direct request, dashboard
-   size-up review) -- the below-cover row cost every banner a second block
-   of vertical space just to hold a title+subtitle that reads fine on the
-   image itself once contrast is handled deliberately, not incidentally.
-   `.page-banner-header-row` is gone; `.page-banner-overlay` (below) is its
-   replacement, now a child of `.page-banner` again -- see
-   _page_banner.html's own comment for the full history and rationale. */
-.page-banner-overlay{
-  display:flex; align-items:center; gap:var(--space-3);
-  position:absolute; left:var(--space-4); bottom:var(--space-3);
-  /* Leaves room on the right for the action-button cluster even though
-     it's no longer on this row (buttons moved to top-right, below) --
-     kept as a safety margin so a very long title's ellipsis point never
-     sits flush against the cover's own rounded corner. */
-  right:var(--space-4);
-  z-index:1;
+   2026-09-13: tried moving the title back onto the photo for a same-day
+   dashboard size-up review (overlay + persistent scrim, avatar shrunk to
+   44px), then reverted back to exactly this below-cover design a few
+   hours later per direct request ("I would like to have the Title below
+   design back with the big avatars") after seeing the on-photo version
+   live. See _page_banner.html's own comment for the fuller history. */
+.page-banner-header-row{
+  display:flex; align-items:flex-end; gap:var(--space-3);
+  /* Pulls the row up by half the avatar's own height (avatar-hero is
+     72px) so the avatar straddles the cover's bottom edge exactly the
+     way it did when it was absolutely positioned -- expressed relative to
+     the avatar's own size, not the (responsive, aspect-ratio-driven)
+     cover height, so this stays correct at every viewport width without
+     needing to know the image's actual rendered height.
+
+     align-items:flex-end (not center, 2026-09-07 follow-up fix -- direct
+     report: dark-image/light-theme title text was unreadable) --
+     center-aligning the title against the avatar's full 72px height put
+     the title's own top half literally over the cover photo (the row's
+     top 36px still overlaps the image), so the page's normal --fg-primary
+     text color -- correct once it's actually below the photo -- was
+     reading against whatever the image's own colors were up there
+     instead. Bottom-aligning both keeps the title entirely within the
+     row's lower 36px, which is the part that's actually below the photo,
+     matching the avatar's own bottom half. */
+  margin-top:-36px; margin-bottom:var(--space-4);
+  padding-left:var(--space-4); padding-right:var(--space-4);
+  position:relative; z-index:1;
 }
 .page-banner-avatar-wrap{flex:none;}
-/* Sized to sit ON the photo now (2026-09-13), not straddle its bottom
-   edge -- smaller than the old 72px straddling version since it no longer
-   needs to read against two different backgrounds (photo above the edge,
-   page background below it) at once, just the one scrim below. */
 .avatar-hero{
-  width:44px; height:44px; font-size:17px;
-  border:2px solid rgba(255,255,255,.8);
-  box-shadow:0 1px 4px rgba(0,0,0,.35);
-  flex:none;
+  width:72px; height:72px; font-size:26px;
+  border:3px solid var(--bg-elevated);
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+}
+/* Colored squircle icon tile (2026-09-13, direct request) -- a Space or
+   Project page renders one of these in the avatar slot instead of the
+   account's own profile photo/initial ("merging [the icon and the
+   profile picture] into something custom for spaces and projects alike"
+   -- a Space/Project was never really "a person," so showing the
+   account's own avatar there never made much sense; its icon used to be
+   prepended to the title text instead, e.g. "📁 CS101" -- that's gone
+   from the title now that the icon lives here).
+
+   Color comes from the Space/Project's own existing `label_config.color`
+   (the same hue name every `.cal-*`/`.tag-*` swatch already reads, see
+   this file's own "Calendar/label swatch palette" comment near the top)
+   -- no new color system. `_page_banner.html` sets `--tile-swatch` inline
+   to `var(--cal-bg-<hue>)` for whichever hue this Space/Project already
+   has; the gradient below just lightens that same color at one end via
+   `color-mix()` rather than needing a second stored color per hue. Reuses
+   `.avatar-circle`'s flex-centering/color/font-weight base (see this
+   file's own `.avatar-circle` rule) and `.avatar-hero`'s sizing above --
+   only the shape and fill are its own. */
+.label-icon-tile{
+  border-radius:28%;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--tile-swatch) 100%, white 22%), var(--tile-swatch));
+  color:#fff;
 }
 .page-banner-title{
-  margin:0; min-width:0; color:#fff; font-weight:700;
+  margin:0; min-width:0; color:var(--fg-primary); font-weight:700;
   letter-spacing:-0.3px; line-height:1.2;
-  font-size:clamp(1rem, 2.2vw, 1.35rem);
-  text-shadow:0 1px 3px rgba(0,0,0,.4);
-  /* Pinned to one line so the overlay row can never grow taller than the
-     avatar next to it (direct request) -- a title that would otherwise
-     wrap just truncates instead. */
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-size:clamp(1.15rem, 2.5vw, 1.6rem);
 }
 .page-banner-title .icon{width:1.15em; height:1.15em; vertical-align:-0.2em;}
-/* Bannerless page's plain title keeps the page's normal text color and
-   can wrap/size like any other h1 -- only the on-photo overlay above
-   needs the white/shadow/single-line treatment. */
-.page-banner-title-plain{
-  color:var(--fg-primary); text-shadow:none; white-space:normal;
-}
 /* Page action bar (2026-08-10) -- ALL of a dashboard/label page's actions
    (New widget / Add-Change banner / Reset layout) live together in
-   .page-banner-actions. With a banner it's a real child of .page-banner,
-   floating top-right over the image (2026-09-13 -- moved up from
-   bottom-right so the button cluster can never land on the same row as
-   the title overlay, regardless of title length or button count); without
-   one it's a plain top bar and the page's h1 title sits left of the
-   buttons (as .page-banner-title-plain), filling the old toolbar's role. */
+   .page-banner-actions. With a banner it's a real child of .page-banner
+   (2026-09-07 -- see _page_banner.html's own comment on why: anchoring
+   to .page-banner-wrap's bottom edge would drift onto the header row
+   below the photo instead of staying pinned to the photo's own corner),
+   floating bottom-right over the image itself; without one it's a plain
+   top bar and the page's h1 title sits left of the buttons (as
+   .page-banner-title-plain), filling the old toolbar's role. */
 .page-banner-actions{
   display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
 }
 .page-banner .page-banner-actions{
-  position:absolute; right:var(--space-4); top:var(--space-3); z-index:2;
+  position:absolute; right:var(--space-4); bottom:var(--space-3); z-index:1;
   justify-content:flex-end; max-width:100%; margin-bottom:0;
 }
 .page-banner-wrap:not(:has(.page-banner)) .page-banner-actions{
@@ -6446,15 +6493,13 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
   backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
 }
 .page-banner .page-banner-actions .btn.ghost:hover{background:rgba(0,0,0,.55); color:#fff;}
-/* Readability scrim -- 2026-09-13: now covers the whole overlay row (up
-   from a thin 35% strip that only had to cover the action buttons),
-   since the title itself is back on the photo. Gradient-only, tuned
-   against a handful of banner photos rather than a solid text-backing
-   chip -- accepted risk that a very busy, edge-to-edge image can still
-   fight the white title text even under this. */
+/* Readability scrim -- now only needed for the action buttons floating
+   over the photo (the title moved off the image entirely, above), but a
+   bright/busy photo can still wash out the frosted chips' own contrast
+   without it. */
 .page-banner::after{
-  content:""; position:absolute; left:0; right:0; bottom:0; height:60%;
-  background:linear-gradient(to top, rgba(0,0,0,.6), transparent);
+  content:""; position:absolute; left:0; right:0; bottom:0; height:35%;
+  background:linear-gradient(to top, rgba(0,0,0,.5), transparent);
   pointer-events:none; z-index:0;
 }
 

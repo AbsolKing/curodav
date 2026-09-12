@@ -277,59 +277,107 @@ class TestPageBannerAvatar:
         assert 'class="page-banner-avatar-wrap"' in body
 
 
-class TestPageBannerOnPhotoOverlay:
+class TestPageBannerNotionStyleHeaderRow:
     """2026-09-07 rework (direct report: "the avatar and text for the big
-    banner is a bit off... remake it Notion-like") moved the title below
-    the cover into `.page-banner-header-row`, off the photo entirely.
+    banner is a bit off... remake it Notion-like") -- the title used to be
+    white overlay text pinned right next to the avatar on the cover photo
+    itself; it now renders below the cover in a normal-colored
+    `.page-banner-header-row`, and the edit-mode action buttons became a
+    real child of `.page-banner` (floating over the photo) instead of a
+    sibling anchored to the whole `.page-banner-wrap`.
 
-    2026-09-13 reverted (direct request, dashboard size-up review): the
-    title + avatar are back inside `.page-banner` itself, in
-    `.page-banner-overlay`, bottom-left on the photo -- with a full-row
-    scrim now, not the old thin under-buttons one -- and the action
-    buttons moved to the cover's top-right corner so they can't collide
-    with the title regardless of its length. See _page_banner.html's
-    `page_banner()` macro and style.css's own `.page-banner-overlay`
-    comment for the full rationale."""
+    2026-09-13: briefly reverted this (title moved back onto the photo,
+    same-day dashboard size-up review) then reverted BACK to exactly this
+    below-cover design a few hours later, direct request ("I would like to
+    have the Title below design back with the big avatars") after seeing
+    the on-photo version live. See _page_banner.html's `page_banner()`
+    macro and style.css's own `.page-banner-header-row` comment for the
+    full round-trip history."""
 
-    def test_title_renders_inside_the_cover_on_the_photo(self, conn):
+    def test_title_renders_inside_the_header_row_below_the_cover_not_on_it(self, conn):
         _set_remote(conn, cached=True, scope="")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
-        assert '<div class="page-banner-overlay">' in body
-        # The overlay (avatar + title) comes after .page-banner's own
-        # opening tag and before the content that follows the whole banner
-        # -- nested inside it, i.e. on the photo, not in a separate block
-        # below it (there's no more .page-banner-header-row at all now).
-        assert "page-banner-header-row" not in body
-        cover_start = body.index('class="page-banner"')
-        overlay_start = body.index('class="page-banner-overlay"')
+        assert '<div class="page-banner-header-row">' in body
+        assert "page-banner-overlay" not in body
+        # The header row (avatar + title) comes after .page-banner's own
+        # closing tag, not nested inside it -- title is below the cover,
+        # not overlaid on it.
+        cover_end = body.index("</div>", body.index('class="page-banner"'))
+        row_start = body.index('class="page-banner-header-row"')
         title_start = body.index('class="page-banner-title"')
-        after_banner = body.index('class="main-shell-body"')
-        assert cover_start < overlay_start < title_start < after_banner
+        assert cover_end < row_start < title_start
 
-    def test_avatar_still_comes_before_the_title_in_the_overlay(self, conn):
+    def test_avatar_still_comes_before_the_title_in_the_header_row(self, conn):
         _set_remote(conn, cached=True, scope="")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
         avatar_start = body.index('class="page-banner-avatar-wrap"')
         title_start = body.index('class="page-banner-title"')
         assert avatar_start < title_start
 
-    def test_edit_mode_actions_are_nested_inside_the_cover_before_the_overlay(self, conn):
+    def test_edit_mode_actions_are_nested_inside_the_cover_not_the_header_row(self, conn):
         _set_remote(conn, cached=True, scope="")
         db.set_app_meta(conn, deps.EDIT_MODE_KEY, "1")
         body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
         cover_start = body.index('class="page-banner"')
+        cover_end = body.index("</div>", body.index('class="page-banner-actions"'))
         actions_start = body.index('class="page-banner-actions"')
-        overlay_start = body.index('class="page-banner-overlay"')
-        # Both the (top-right) actions and the (bottom-left) overlay are
-        # markup children of .page-banner, actions rendered first -- neither
-        # moved outside the cover.
-        assert cover_start < actions_start < overlay_start
+        header_row_start = body.index('class="page-banner-header-row"')
+        # Actions sit between the cover's own opening tag and the header
+        # row that follows -- i.e. still inside .page-banner, not moved
+        # down alongside the avatar/title.
+        assert cover_start < actions_start < header_row_start
 
-    def test_project_page_gets_the_same_overlay(self, conn):
+    def test_project_page_gets_the_same_header_row(self, conn):
         db.upsert_label_config(conn, {"name": "Garden", "is_project": 1, "start_date": "2026-01-01", "end_date": "2026-12-31", "created_at": _now()})
         _set_remote(conn, cached=True, scope=deps.PAGE_HEADER_BANNER_SCOPE)
         body = projects_router.project_detail("Garden", _request("/projects/Garden"), conn=conn).body.decode()
-        assert '<div class="page-banner-overlay">' in body
+        assert '<div class="page-banner-header-row">' in body
+
+
+class TestLabelIconTile:
+    """2026-09-13 (direct request: "why have we abandoned the rounded
+    square with gradient background and icon for spaces? I want it...
+    merging [the icon and the profile picture] into something custom for
+    spaces and projects alike") -- a Space/Project page's banner avatar
+    slot renders `.label-icon-tile` (a colored squircle, style.css) using
+    the label's own existing `color`, instead of the account's profile
+    photo/initial. Home is unaffected -- it never had a label to draw a
+    color/icon from, and still shows the account's own avatar."""
+
+    def test_space_page_gets_an_icon_tile_not_the_profile_avatar(self, conn):
+        db.upsert_label_config(conn, {"name": "Work", "generate_space": 1, "color": "teal", "icon": "briefcase", "created_at": _now()})
+        _set_remote(conn, cached=True, scope="Work")
+        body = spaces_router.space_detail("Work", _request("/spaces/Work"), conn=conn).body.decode()
+        assert 'class="label-icon-tile avatar-hero avatar-circle"' in body
+        assert "--tile-swatch:var(--cal-bg-teal)" in body
+        assert '<span class="avatar-circle avatar-hero">' not in body  # no profile-photo fallback rendered instead
+
+    def test_project_page_gets_an_icon_tile_with_its_own_color(self, conn):
+        db.upsert_label_config(conn, {"name": "Garden", "is_project": 1, "color": "green", "icon": "leaf", "start_date": "2026-01-01", "end_date": "2026-12-31", "created_at": _now()})
+        _set_remote(conn, cached=True, scope=deps.PAGE_HEADER_BANNER_SCOPE)
+        body = projects_router.project_detail("Garden", _request("/projects/Garden"), conn=conn).body.decode()
+        assert "--tile-swatch:var(--cal-bg-green)" in body
+
+    def test_title_no_longer_has_the_icon_prepended(self, conn):
+        # The icon used to render inline in the <h1> (e.g. "📁 CS101") --
+        # it lives only in the tile now, so the title text is the plain
+        # name.
+        db.upsert_label_config(conn, {"name": "CS101", "color": "blue", "icon": "book", "created_at": _now()})
+        _set_remote(conn, cached=True, scope="CS101")
+        body = labels_router.label_detail("CS101", _request("/labels/CS101"), conn=conn).body.decode()
+        title_start = body.index('class="page-banner-title"')
+        title_end = body.index("</h1>", title_start)
+        title_html = body[title_start:title_end]
+        assert "CS101" in title_html
+        assert "<svg" not in title_html  # icon() renders an <svg> -- none should land in the title itself
+
+    def test_home_still_shows_the_profile_avatar(self, conn):
+        # Home has no label to draw a color/icon from -- unaffected by
+        # the icon-tile change.
+        _set_remote(conn, cached=True, scope="")
+        body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
+        assert "label-icon-tile" not in body
+        assert '<span class="avatar-circle avatar-hero">U</span>' in body
 
 
 class TestPageBannerDefaultFallback:

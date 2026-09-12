@@ -17,6 +17,64 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- second same-day banner round-trip (direct
+  request, after seeing the on-photo/44px-avatar version live): "I would
+  like to have the Title below design back with the big avatars." Reverted
+  the title-overlay experiment from earlier today back to the exact
+  2026-09-07 below-cover structure (`.page-banner-header-row`, 72px
+  `.avatar-hero`, actions bottom-right, thin 35% scrim) -- kept the
+  `.page-banner-cover` class fix from the earlier bug, since it's a good
+  idea regardless of layout direction. **Net effect of the whole day's
+  three banner changes: back to 2026-09-07's design, structurally
+  unchanged, just with that one CSS scoping fix retained.**
+
+  Two genuinely new things landed alongside the revert, both direct
+  requests:
+
+  1. **Colored squircle icon tile for Space/Project pages**
+     (`.label-icon-tile`, style.css) -- replaces the account's own profile
+     photo/avatar in the banner's avatar slot on a Space or Project page
+     ("why have we abandoned the rounded square with gradient background
+     and icon for spaces? ... merging [the icon and the profile picture]
+     into something custom for spaces and projects alike"). Color comes
+     from the label's own existing `color` field (same `--cal-bg-<hue>`
+     variable every `.cal-*`/`.tag-*` swatch already reads -- no new color
+     system), lightened at one gradient stop via `color-mix()`. The
+     label's icon, which used to render inline in the page title text
+     (e.g. "📁 CS101"), now lives only in the tile -- `page_banner()`
+     macro gained an `icon_tile={'icon':..., 'color':...}` optional 2nd
+     arg (`None` on Home, which still shows the profile photo).
+     `label_detail.html`/`project_detail.html` updated to pass it and stop
+     prepending the icon to the title string.
+
+  2. **At a Glance stat blocks now permanently tinted**, not just on
+     hover (direct request: "steal the way information is displayed and
+     styled from the [dashboard size-up] mockup") -- each stat reads as
+     its own block at a glance. Explicitly did NOT also bring over the
+     mockup's bottom-border row dividers on Agenda/Upcoming lists --
+     flagged to the user first that this codebase has a dated, deliberate
+     decision (`.widget-content tbody tr{border-bottom:none;}`, see its
+     own comment) to remove exactly that kind of divider after direct
+     "archaic"/spreadsheet-like feedback; confirmed they wanted that
+     decision left standing before touching it.
+
+  **Tests**: `test_banners.py`'s `TestPageBannerOnPhotoOverlay` reverted
+  back to `TestPageBannerNotionStyleHeaderRow` (undoing this morning's
+  rename), new `TestLabelIconTile` class (4 tests: tile renders with the
+  right color on Space/Project, title no longer carries an inline icon,
+  Home is unaffected). Full suite re-verified in 4 batches under `TZ=UTC`
+  -- **2204 passed, 0 failed** (2200 + 4 new icon-tile tests, net zero
+  change to the reverted banner-structure tests). Same 4 pre-existing
+  local-clock-flakiness tests noted in earlier entries are unaffected.
+
+  **Next slice**: this banner design has now round-tripped twice in one
+  day (below-cover -> on-photo -> below-cover) -- worth treating the
+  current below-cover/big-avatar/squircle-tile shape as settled rather
+  than revisiting again without a concrete new complaint. Still
+  deliberately deferred: banner subtitle content (date under Home's
+  greeting, project/task counts under a Space/Project name) -- not
+  requested again this round either.
+
 - **Shipped:** 2026-09-13 -- same-day bug fix on the banner rework
   directly below, direct report with a screenshot ("the avatar is too
   big"). Root cause: `.page-banner img{width:100%;height:100%;object-
