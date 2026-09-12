@@ -2650,7 +2650,7 @@ tr:hover .task-row-delete, tr:focus-within .task-row-delete{opacity:1;}
   display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;
 }
 .avatar-large{width:52px; height:52px; font-size:20px;}
-img.avatar-circle{object-fit:cover; border:1px solid var(--border);}
+img.avatar-circle{object-fit:cover;}
 .contact-quick-actions{display:flex; gap:8px; margin-bottom:14px;}
 
 /* Photo upload field (contact_form.html) -- avatar (real photo or initials
@@ -6448,7 +6448,13 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    only the shape and fill are its own. */
 .label-icon-tile{
   border-radius:28%;
-  background:linear-gradient(135deg, color-mix(in srgb, var(--tile-swatch) 100%, white 22%), var(--tile-swatch));
+  /* 2026-09-13 direct fix: the two color-mix() percentages here used to
+     read 100%/22% (summing to 122%, not 100%) -- per the CSS Color 4
+     spec, percentages that don't sum to 100% get normalized in a way
+     that can knock alpha down off fully opaque. Written as 78%/22%
+     (an exact 100% split) so the lighter gradient stop is guaranteed
+     fully opaque, not just "probably fine in this browser." */
+  background:linear-gradient(135deg, color-mix(in srgb, var(--tile-swatch) 78%, white 22%), var(--tile-swatch));
   color:#fff;
 }
 .page-banner-title{

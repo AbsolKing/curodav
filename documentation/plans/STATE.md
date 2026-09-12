@@ -17,6 +17,22 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- two small direct-feedback CSS fixes on the
+  banner/icon-tile work directly below, same day:
+  1. `img.avatar-circle` no longer gets a `1px solid var(--border)` ring
+     -- direct request, dropped outright, no replacement border.
+  2. `.label-icon-tile`'s gradient used `color-mix(in srgb, var(--tile-
+     swatch) 100%, white 22%)` -- two percentages summing to 122%, not
+     100%. Per the CSS Color 4 spec, percentages that don't sum to 100%
+     get normalized in a way that can pull the result off fully opaque --
+     direct report ("make the background be full opacity") confirmed this
+     was visible. Rewritten as an exact 78%/22% split so the lighter
+     gradient stop is guaranteed fully opaque rather than "probably fine
+     in this browser."
+  **Tests**: pure CSS, none needed. Full suite re-verified in 4 batches
+  under `TZ=UTC` -- **2204 passed, 0 failed**, unchanged from the entry
+  below (as expected for a CSS-only change).
+
 - **Shipped:** 2026-09-13 -- second same-day banner round-trip (direct
   request, after seeing the on-photo/44px-avatar version live): "I would
   like to have the Title below design back with the big avatars." Reverted
