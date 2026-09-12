@@ -243,6 +243,22 @@ class TestPageBannerAvatar:
         assert "data:image/png;base64," not in body
         assert '/settings/profile-photo/image?v=' in body
 
+    def test_uploaded_avatar_photo_is_not_tagged_as_the_cover_image(self, conn):
+        # Regression test (2026-09-13 bug report: "the avatar is too big").
+        # The cover photo's own sizing rule (style.css's `.page-banner-cover`,
+        # was the bare descendant selector `.page-banner img`) is scoped to
+        # a dedicated class precisely so it can never again match the
+        # avatar's own <img> now that both live inside .page-banner --
+        # confirm at the markup level that the avatar photo never carries
+        # that class, and the real cover image always does.
+        db.set_profile_photo(conn, base64.b64encode(b"photo-bytes").decode("ascii"), "png")
+        _set_remote(conn, cached=True, scope="")
+        body = dashboard_router.dashboard_view(_request("/"), conn=conn).body.decode()
+        avatar_tag_start = body.index('class="avatar-circle avatar-hero"')
+        avatar_tag_line = body[body.rfind("<img", 0, avatar_tag_start):body.index(">", avatar_tag_start)]
+        assert "page-banner-cover" not in avatar_tag_line
+        assert 'class="page-banner-cover"' in body
+
     def test_project_page_shows_avatar_with_a_banner(self, conn):
         _make_label(conn, "CS101")
         _set_remote(conn, cached=True, scope="CS101")

@@ -80,18 +80,30 @@
        fetchpriority="high" (2026-08-10) -- the banner is this page's hero,
        the first image in the document, so the browser should fetch it as
        early as it does the CSS/JS rather than deprioritizing it. #}
+    {# page-banner-cover (2026-09-13, bug fix): a dedicated class for the
+       cover photo itself, not a bare `.page-banner img` descendant
+       selector -- that selector used to be safe when the avatar lived
+       below the cover (outside .page-banner entirely), but this same
+       session's title-overlay rework moved the avatar's own <img>
+       (uploaded-photo case, deps.py's avatar()) INSIDE .page-banner too,
+       so the old selector started matching it as well and blew it up to
+       the cover's own width:100%/height:100% -- direct bug report ("the
+       avatar is too big") confirmed exactly this. Scoping the rule to
+       this class instead of "any img in .page-banner" makes that whole
+       class of bug impossible regardless of what else ever gets nested
+       in here. #}
     {% if banner.version %}
-    <img src="/banners/image?scope={{ banner_image_scope|urlencode }}&amp;v={{ banner.version }}" alt="{{ banner.alt or '' }}" fetchpriority="high">
+    <img class="page-banner-cover" src="/banners/image?scope={{ banner_image_scope|urlencode }}&amp;v={{ banner.version }}" alt="{{ banner.alt or '' }}" fetchpriority="high">
     {% else %}
     {# referrerpolicy="no-referrer" keeps a hotlinked search image from
        leaking the page URL to the host serving it. #}
-    <img src="{{ banner.image_url }}" alt="{{ banner.alt or '' }}" referrerpolicy="no-referrer" fetchpriority="high">
+    <img class="page-banner-cover" src="{{ banner.image_url }}" alt="{{ banner.alt or '' }}" referrerpolicy="no-referrer" fetchpriority="high">
     {% endif %}
     {# .is-loaded JS reveal (app.js) leaves the image at opacity 0 until it
        decodes; with JS disabled that class never arrives, so this forces
        the img visible for no-JS visitors (the noscript style is inert when
        scripting is enabled). #}
-    <noscript><style nonce="{{ csp_nonce() }}">.page-banner img{opacity:1;}</style></noscript>
+    <noscript><style nonce="{{ csp_nonce() }}">.page-banner-cover{opacity:1;}</style></noscript>
     {# Page actions (New widget / Add-Change banner / Reset layout) are a
        real child of .page-banner, top-right corner (2026-09-13 -- moved up
        from bottom-right so they can never land on the same row as the

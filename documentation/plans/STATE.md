@@ -17,6 +17,36 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- same-day bug fix on the banner rework
+  directly below, direct report with a screenshot ("the avatar is too
+  big"). Root cause: `.page-banner img{width:100%;height:100%;object-
+  fit:cover}` was a bare descendant selector -- harmless while the avatar
+  lived below the cover (outside `.page-banner` entirely, pre-this-
+  session), but the title-overlay rework moved the avatar's own `<img>`
+  (the uploaded-photo case; the no-photo `<span>` initial fallback was
+  never affected) inside `.page-banner` too, so this rule started matching
+  it as well and stretched a 44px avatar photo to the full cover box.
+  Fixed by giving the cover image its own dedicated class
+  (`.page-banner-cover`, set in `_page_banner.html`) instead of a bare
+  `img` descendant selector, so only the actual cover photo is ever
+  affected regardless of what else is nested in `.page-banner` in the
+  future. Added a regression test (`test_banners.py::TestPageBannerAvatar
+  ::test_uploaded_avatar_photo_is_not_tagged_as_the_cover_image`) that
+  asserts the avatar's `<img>` never carries `.page-banner-cover` and the
+  real cover image always does.
+
+  **Tests**: full suite re-verified in 4 batches under `TZ=UTC` -- **2200
+  passed, 0 failed** (2199 + the 1 new regression test). Same 4
+  pre-existing local-clock-flakiness tests noted in the entry below are
+  unaffected by this fix.
+
+  **Next slice**: verify this fix against the user's own live instance
+  (a real banner photo + a real uploaded avatar photo, not just unit
+  tests) since this bug was only caught via a live screenshot, not by the
+  test suite that shipped with the original rework -- worth being more
+  skeptical of "tests pass" as sufficient sign-off for anything CSS-layout
+  shaped going forward.
+
 - **Shipped:** 2026-09-13 -- dashboard/Space "size-up" review (direct
   request, worked through an HTML mockup first before touching real code:
   layout/data-density pass, no new features). Two changes:

@@ -6348,7 +6348,17 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
 @media (min-width:721px){
   .page-banner{aspect-ratio:5 / 1;}
 }
-.page-banner img{
+/* 2026-09-13 bug fix: was the bare descendant selector `.page-banner img`,
+   which matched ANY <img> inside .page-banner -- harmless while the
+   avatar lived below the cover (outside .page-banner entirely), but once
+   this same session's title-overlay rework moved the avatar's own <img>
+   (uploaded-photo case) inside .page-banner too, this rule started
+   matching it as well and stretched it to the cover's own 100%/100% --
+   direct bug report ("the avatar is too big") was exactly this. Scoped to
+   a dedicated `.page-banner-cover` class (set in _page_banner.html) so
+   only the actual cover photo is ever affected, regardless of what else
+   gets nested in .page-banner in the future. */
+.page-banner-cover{
   width:100%; height:100%; object-fit:cover; display:block;
 }
 .page-banner-wrap{position:relative;}
