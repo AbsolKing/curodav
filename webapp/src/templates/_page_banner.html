@@ -122,10 +122,26 @@
        passes {'icon': ..., 'color': ...} here instead of leaving this
        None, swapping the person avatar for a colored squircle icon tile
        (`.label-icon-tile`, style.css) sized identically (`avatar-hero`)
-       so the straddle math below is unaffected either way. #}
+       so the straddle math below is unaffected either way.
+
+       `var(--cal-bg-{{ '...' }}, var(--cal-bg-blue))` (2026-09-13 direct
+       fix, "the --tile-swatch doesn't have full opacity") -- `color` is
+       normally one of the 16 names in routers/labels.py's `COLORS`, every
+       UI write path enforces it, but `scripts/migrate_labels.py`'s
+       one-time carry-forward of legacy calendar/task-list/project colors
+       has no such guard, so an older label can hold a color name outside
+       the current 16. `var(--cal-bg-<unknown-name>)` with no fallback is
+       "guaranteed-invalid," which doesn't just skip that one property --
+       it makes the WHOLE `background` declaration on `.label-icon-tile`
+       invalid at computed-value time, so it resets to transparent instead
+       of falling back to anything -- exactly the "not full opacity"
+       report, and it would have kept happening for any current/future
+       label with an unrecognized color, not just a one-off value to hunt
+       down and hand-fix in the database. The explicit fallback here
+       guarantees `--tile-swatch` is always a real color either way. #}
     <div class="page-banner-avatar-wrap">
         {% if icon_tile %}
-        <span class="label-icon-tile avatar-hero avatar-circle" style="--tile-swatch:var(--cal-bg-{{ icon_tile.color }});">{{ icon(icon_tile.icon, 'icon-lg') }}</span>
+        <span class="label-icon-tile avatar-hero avatar-circle" style="--tile-swatch:var(--cal-bg-{{ icon_tile.color }}, var(--cal-bg-blue));">{{ icon(icon_tile.icon, 'icon-lg') }}</span>
         {% else %}
         {{ avatar({'photo_url': '/settings/profile-photo/image?v=' ~ profile_photo.version if profile_photo else None, 'photo_b64': profile_photo.photo_b64 if profile_photo else None, 'photo_type': profile_photo.photo_type if profile_photo else None, 'full_name': (display_name or 'U')}, 'avatar-hero') }}
         {% endif %}

@@ -17,6 +17,39 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- follow-up direct report on the previous
+  entry's opacity fix ("the --tile-swatch doesn't have full opacity") --
+  the 78%/22% color-mix() fix was real but not the whole story. Root
+  cause this time: `_page_banner.html` builds `--tile-swatch` as
+  `var(--cal-bg-{{ icon_tile.color }})` with no fallback. `color` is
+  normally one of the 16 names in routers/labels.py's `COLORS` -- every
+  UI write path enforces it -- but `scripts/migrate_labels.py`'s one-time
+  carry-forward of legacy calendar/task-list/project colors has no such
+  guard (confirmed via code reading, not just inference), and
+  `label_config.color` itself has no DB-level CHECK constraint. A label
+  whose color predates the current palette makes `var(--cal-bg-<unknown-
+  name>)` "guaranteed-invalid" -- which doesn't just skip that one
+  property, it invalidates the WHOLE `background` declaration on
+  `.label-icon-tile` at computed-value time, rendering transparent
+  instead of any color. Fixed with an explicit fallback:
+  `var(--cal-bg-{{ color }}, var(--cal-bg-blue))`, so `--tile-swatch`
+  always resolves to a real opaque color regardless of what a legacy
+  label's color name actually is.
+
+  **Tests**: updated the two existing `TestLabelIconTile` assertions for
+  the new fallback syntax, added
+  `test_unrecognized_legacy_color_falls_back_to_blue_not_transparent`
+  (seeds a label with `color="turquoise"`, outside the 16-name set,
+  confirms the fallback renders). Full suite re-verified in 4 batches
+  under `TZ=UTC` -- **2205 passed, 0 failed** (2204 + 1 new test).
+
+  **Next slice**: the underlying data gap (labels with out-of-palette
+  color values, or `label_config.color` lacking any DB-level constraint)
+  is still there -- this fix makes the CSS resilient to it, but doesn't
+  clean up or guard against it at the source. Worth its own slice if it
+  turns out to affect other `.cal-*`/`.tag-*` consumers too, not just this
+  one new tile.
+
 - **Shipped:** 2026-09-13 -- two small direct-feedback CSS fixes on the
   banner/icon-tile work directly below, same day:
   1. `img.avatar-circle` no longer gets a `1px solid var(--border)` ring

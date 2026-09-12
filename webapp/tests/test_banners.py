@@ -349,14 +349,34 @@ class TestLabelIconTile:
         _set_remote(conn, cached=True, scope="Work")
         body = spaces_router.space_detail("Work", _request("/spaces/Work"), conn=conn).body.decode()
         assert 'class="label-icon-tile avatar-hero avatar-circle"' in body
-        assert "--tile-swatch:var(--cal-bg-teal)" in body
+        assert "--tile-swatch:var(--cal-bg-teal, var(--cal-bg-blue))" in body
         assert '<span class="avatar-circle avatar-hero">' not in body  # no profile-photo fallback rendered instead
 
     def test_project_page_gets_an_icon_tile_with_its_own_color(self, conn):
         db.upsert_label_config(conn, {"name": "Garden", "is_project": 1, "color": "green", "icon": "leaf", "start_date": "2026-01-01", "end_date": "2026-12-31", "created_at": _now()})
         _set_remote(conn, cached=True, scope=deps.PAGE_HEADER_BANNER_SCOPE)
         body = projects_router.project_detail("Garden", _request("/projects/Garden"), conn=conn).body.decode()
-        assert "--tile-swatch:var(--cal-bg-green)" in body
+        assert "--tile-swatch:var(--cal-bg-green, var(--cal-bg-blue))" in body
+
+    def test_unrecognized_legacy_color_falls_back_to_blue_not_transparent(self, conn):
+        # Regression test (direct report: "the --tile-swatch doesn't have
+        # full opacity"). routers/labels.py's COLORS guard covers every
+        # UI write path, but scripts/migrate_labels.py's one-time
+        # carry-forward of legacy calendar/task-list/project colors has no
+        # such guard -- an older label can hold a color name outside the
+        # current 16 (`db.upsert_label_config` itself has no CHECK
+        # constraint). `var(--cal-bg-<unknown-name>)` with no fallback is
+        # "guaranteed-invalid" at computed-value time, which doesn't just
+        # skip that property -- it invalidates the WHOLE background
+        # declaration on .label-icon-tile, rendering transparent instead
+        # of any color at all. The explicit `, var(--cal-bg-blue)` fallback
+        # (_page_banner.html) guarantees --tile-swatch always resolves to
+        # a real, fully-opaque color even for a color name that predates
+        # the current palette.
+        db.upsert_label_config(conn, {"name": "Legacy", "generate_space": 1, "color": "turquoise", "icon": "folder", "created_at": _now()})
+        _set_remote(conn, cached=True, scope="Legacy")
+        body = spaces_router.space_detail("Legacy", _request("/spaces/Legacy"), conn=conn).body.decode()
+        assert "--tile-swatch:var(--cal-bg-turquoise, var(--cal-bg-blue))" in body
 
     def test_title_no_longer_has_the_icon_prepended(self, conn):
         # The icon used to render inline in the <h1> (e.g. "📁 CS101") --
