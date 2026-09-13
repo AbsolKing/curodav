@@ -5,6 +5,7 @@
 #   sudo /path/to/repo/scripts/curodav-ctl install   # first install (bootstrap from a clone)
 #   sudo curodav-ctl update                          # deploy latest main, atomic swap, auto-rollback
 #   sudo curodav-ctl install --dav                    # add/reconfigure public CalDAV/CardDAV (see deploy/README.md)
+#       curodav-ctl status                            # just the reachability/consistency checks below, no deploy
 #   sudo curodav-ctl remove                          # tear down (destructive, confirms)
 #
 # Layout:
@@ -144,6 +145,35 @@ radicale_reachability_check() {
     *)
       warn "  public (https://${domain_app}/radicale/): unexpected HTTP ${public_code} -- check nginx's /radicale/ block and Cloudflare's WAF/Bot Fight Mode settings." ;;
   esac
+}
+
+# Non-fatal env-file consistency check (direct feedback: "the way these env
+# variables are set... opaque and hard to set or verify"). CC_RADICALE_URL
+# (what the app actually syncs against, always loopback) and
+# CC_RADICALE_PUBLIC_URL (display-only, Published Lists' subscribe link)
+# are supposed to name the SAME Radicale user under different hosts --
+# nothing enforces that at write time if either was hand-edited after the
+# fact (e.g. RADICALE_USER rotated via a fresh 'install --dav' run without
+# also fixing a manually-edited CC_RADICALE_URL). No-ops quietly when
+# ENV_FILE doesn't exist yet or doesn't have both vars set -- there's
+# nothing to compare.
+radicale_env_consistency_check() {
+  if [ ! -f "$ENV_FILE" ]; then
+    return 0
+  fi
+  local url public_url url_user public_user
+  url="$(grep -E '^CC_RADICALE_URL=' "$ENV_FILE" | tail -n1 | cut -d= -f2- | tr -d '"')"
+  public_url="$(grep -E '^CC_RADICALE_PUBLIC_URL=' "$ENV_FILE" | tail -n1 | cut -d= -f2- | tr -d '"')"
+  if [ -z "$url" ] || [ -z "$public_url" ]; then
+    return 0
+  fi
+  url_user="$(echo "${url%/}" | awk -F/ '{print $NF}')"
+  public_user="$(echo "${public_url%/}" | awk -F/ '{print $NF}')"
+  if [ -n "$url_user" ] && [ -n "$public_user" ] && [ "$url_user" != "$public_user" ]; then
+    warn "  ${ENV_FILE}: CC_RADICALE_URL's user (\"${url_user}\") and CC_RADICALE_PUBLIC_URL's (\"${public_user}\") don't match -- one of them is stale."
+  else
+    log "  ${ENV_FILE}: CC_RADICALE_URL and CC_RADICALE_PUBLIC_URL agree on the Radicale user (\"${url_user}\")."
+  fi
 }
 
 detect_repo_url_from_self() {
@@ -426,6 +456,7 @@ run_dav_setup() {
   unset RADICALE_PASSWORD RADICALE_PASSWORD_CONFIRM
 
   radicale_reachability_check
+  radicale_env_consistency_check
   log "DAV setup complete. DAVx5 account: https://${domain_app}/radicale/${radicale_user}/ (user: ${radicale_user})"
 }
 
@@ -557,6 +588,7 @@ cmd_update() {
     prune_releases
     log "Deploy complete: ${release_name}"
     radicale_reachability_check
+    radicale_env_consistency_check
   else
     err "Health check FAILED. Rolling back..."
     if [ -n "$old_current" ]; then
@@ -606,9 +638,20 @@ case "${1:-}" in
     cmd_install
     ;;
   update)  cmd_update ;;
+  status)
+    # No require_root -- every check here (curl against loopback/nginx/
+    # public hostname, grep-ing ENV_FILE) is a plain read, and the whole
+    # point is a fast "is this actually working right now" answer without
+    # needing sudo or triggering a deploy. Direct feedback: "I don't know
+    # if [the env vars] are set correctly" -- this is the standalone
+    # answer to that, previously only available as a side effect of
+    # 'install --dav' or 'update'.
+    radicale_reachability_check
+    radicale_env_consistency_check
+    ;;
   remove)  cmd_remove ;;
   *)
-    echo "Usage: curodav-ctl {install [--dav]|update|remove}" >&2
+    echo "Usage: curodav-ctl {install [--dav]|update|status|remove}" >&2
     exit 2
     ;;
 esac

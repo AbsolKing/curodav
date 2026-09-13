@@ -241,6 +241,25 @@ resolves on this host.
   a warning and keeps going rather than aborting; check the Cloudflare
   DNS tab for that zone if the hostname doesn't resolve afterward.
 
+## Checking things are still set up correctly
+
+```bash
+curodav-ctl status
+```
+
+No `sudo` needed and touches nothing -- runs the same reachability checks
+`update`/`install --dav` already run as a side effect (loopback, the local
+nginx path-route, and the public hostname if `deploy.env` exists), plus a
+consistency check that `CC_RADICALE_URL` and `CC_RADICALE_PUBLIC_URL` in
+`/srv/curodav/shared/.env` still agree on which Radicale user they point
+at. Useful any time you've hand-edited the env file, rotated
+`RADICALE_USER`, or just want a "is this actually working" answer without
+digging through `journalctl`. The app's own Settings > Data & Maintenance
+page (2026-09-13) covers the complementary question -- which of env file /
+database / dev-default this *process* is actually running with right now,
+whether the env file has drifted from what's loaded, and a one-click live
+"Test connection" -- from inside the browser instead of SSH.
+
 ## Rotating the Radicale password
 
 ```bash

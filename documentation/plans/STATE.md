@@ -17,6 +17,92 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- same-day follow-up direct request: "the way
+  these env variables are set, I think they are a bit opaque and hard to
+  set or verify. I also don't know if they are set correctly if set in
+  app or in the app setup." Diagnosed first (see this session's earlier
+  turn): Radicale is the genuinely-different case from a sibling project's
+  SearXNG confusion (external CalDAV/CardDAV clients bypass curodav's own
+  frontend entirely and need direct DAV access), and the public route
+  (one hostname, nginx path-split, loopback-bound Radicale) was already
+  correctly wired from the prior DAV-automation slice below -- nothing
+  missing there. The actual gap was visibility: three places
+  (`CC_RADICALE_*` env vars / app_meta / the devuser/devpass dev default)
+  can supply the live connection, with an undocumented-outside-comments
+  precedence rule, no drift detection between an edited env file and the
+  running process, and no way to ask "does this actually work" short of
+  watching `journalctl` during a real phone sync.
+
+  Fixed, app-side (`routers/settings.py`, new "Radicale config
+  visibility" block above `_radicale_config_source`):
+  - `_radicale_config_source(settings, conn)` -- one-line readout of
+    which of the three sources is actually live right now.
+  - `_env_file_drift(settings)` -- compares the on-disk env file's
+    `CC_RADICALE_*` values against what this running process actually
+    loaded at startup; non-None only when they disagree (an edit since
+    the last restart).
+  - `_radicale_public_url_mismatch(settings)` -- flags when
+    `CC_RADICALE_PUBLIC_URL` and `CC_RADICALE_URL` name different
+    Radicale users (comparing only the last path segment; scheme/host
+    legitimately differ by design).
+  - `_check_radicale_connection(settings)` + new `POST
+    /settings/radicale/test-connection` route -- a live, authenticated
+    PROPFIND against the settings this process currently has loaded,
+    deliberately bypassing `app.state.bridge` (a startup-time snapshot
+    that's `None` forever if Radicale was unreachable at boot, so reading
+    it would repeat one stale verdict on every click).
+  All four feed Data & Maintenance's "CalDAV / Radicale sync" card
+  (`settings_data_maintenance.html`): current URL, source, public URL (if
+  set) + mismatch warning, drift warning, and a "Test connection" button
+  using the page's existing toast mechanism.
+
+  Fixed, deploy-side (`scripts/curodav-ctl`): new `curodav-ctl status`
+  subcommand -- no root needed, runs the existing
+  `radicale_reachability_check` (loopback/nginx/public-hostname tiers,
+  previously only a side effect of `install --dav`/`update`) plus a new
+  `radicale_env_consistency_check` (greps `ENV_FILE` directly, warns if
+  `CC_RADICALE_URL`/`CC_RADICALE_PUBLIC_URL` disagree on the Radicale
+  user) standalone, without triggering a deploy. Both checks also now run
+  at the end of `install --dav` and every `update`. `deploy/README.md`
+  gained a "Checking things are still set up correctly" section
+  documenting the split: `curodav-ctl status` (SSH, no browser) vs. the
+  new Settings card (browser, no SSH) as complementary, not competing,
+  answers to "is this actually working."
+
+  Deliberately NOT done this session (out of scope for "visibility," not
+  forgotten): Radicale itself still has no brute-force/rate-limit
+  protection on its htpasswd+bcrypt auth (flagged in the diagnosis, no
+  code change) -- a real gap, but a different kind of fix (fail2ban or a
+  Cloudflare rate-limit rule on `/radicale/*`) from what this slice
+  addressed.
+
+  **Tests**: `test_settings_radicale.py` gained
+  `TestRadicaleConfigSource`/`TestRadicaleEnvDrift`/
+  `TestRadicalePublicUrlMismatch`/`TestCheckRadicaleConnection` (15 new
+  tests total in that file, all passing) exercising all four helpers
+  directly plus the new route's failure path against an unreachable
+  local port (fails fast, no real Radicale/network needed). Found and
+  fixed one PRE-EXISTING bug while running the full suite as a
+  consequence of touching this area: `test_page_header_narrow.py`'s
+  shared `_request_with_app` fixture was missing
+  `radicale_public_base_url` entirely (a `SimpleNamespace`, not the real
+  `Settings` dataclass) -- `published_lists.list_index` reads that field
+  with a direct attribute access (no `getattr` guard, unlike most other
+  callers), so `test_published_lists` was failing with an `AttributeError`
+  before this fix; that field was added to `config.Settings` in the
+  DAV-automation slice below and this one fixture was missed. Full suite
+  (`PYTHONPATH=src ../.venv/bin/python -m pytest -q`, run in batches in
+  this sandbox since one shell call can't hold the ~70s the whole suite
+  takes): 2,224 tests, all green, `test_caldav_bridge_live.py` included
+  (auto-skips without a live `radicale` package install; ran clean here).
+
+  **Not live-verified**: no real server to click "Test connection"
+  against a genuinely public `DOMAIN_APP` or run `curodav-ctl status`
+  against a live systemd deploy from this session -- `bash -n`
+  syntax-checked `curodav-ctl`, and the connection-test/drift/mismatch
+  logic is covered by the unit tests above using an unreachable local
+  port and hand-built fixtures instead of a real Radicale server.
+
 - **Shipped:** 2026-09-13 -- direct request: automate the DAVx5/Radicale
   deploy story that `deploy/README.md` previously documented as a one-time
   manual walkthrough. `scripts/curodav-ctl` gained `install --dav`
