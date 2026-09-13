@@ -2987,7 +2987,7 @@ main.main-calendar > .page-header-narrow{flex:none;}
    aside -- that aside stays flex:none below, the grid card claims the
    remainder). */
 main.main-calendar > .calendar-viewport,
-main.main-calendar > .project-calendar-layout{flex:1 1 auto; min-height:0; margin-bottom:0;}
+main.main-calendar > .project-calendar-layout{flex:1 1 auto; min-height:0; margin-bottom:8dvh;}
 /* The widget itself: a flex column so a Week/Day time grid can pin its
    header (below) while scrolling the hours, and a scroll container in
    its own right so Month/4-Week (no further internal flex target) also
@@ -3241,7 +3241,16 @@ main.main-calendar .month-week-grid{flex:1 1 0;}
    plain document-flow context .card is used in elsewhere. */
 .project-calendar-layout > .card{margin-bottom:0;}
 .project-calendar-unscheduled{width:100%; flex:none;}
-.project-calendar-grid{flex:1; min-width:0;}
+/* min-height:0 (added alongside the pre-existing min-width:0) -- without
+   it, this flex:1 child of the column-direction .project-calendar-layout
+   defaults to min-height:auto, which floors it at its own content height
+   (24 hours of .time-grid-body) rather than letting it shrink to the
+   space actually left in the layout. That silently defeated the internal
+   overflow-y:auto already declared on main.main-calendar .calendar-viewport
+   and .time-grid-wrap above -- the card just grew past the viewport
+   instead of scrolling, pushing the whole page into document-level
+   scroll rather than scrolling the grid in place. */
+.project-calendar-grid{flex:1; min-width:0; min-height:0;}
 /* Collapsible "Unscheduled work" strip (1.9 side work,
    static/unscheduled_panel_toggle.js) -- header (title + toggle button)
    always visible; collapsed hides the item strip entirely, leaving just the
@@ -3314,6 +3323,17 @@ main.main-calendar .month-week-grid{flex:1 1 0;}
    back toward the earlier 84px "3 rows" version that read as oversized. */
 #unscheduled-panel-body{height:36px; overflow-y:auto; scrollbar-width:none;}
 #unscheduled-panel-body::-webkit-scrollbar{display:none;}
+/* The "No unscheduled work -- ..." empty-state sentence (_calendar_week_
+   grid.html) is long enough to wrap to 2-3 lines inside the fixed 36px
+   single-row height above on a narrow phone, clipping instead of reading
+   -- the empty aside carries no information a mobile user needs anyway
+   (there's simply nothing to drag), so it's hidden below the mobile
+   breakpoint rather than resized. Scoped to this panel's own empty state,
+   not the shared .empty-state-compact class (also used by
+   _task_work_allocations.html, which should keep its text everywhere). */
+@media (max-width:720px){
+  #unscheduled-panel-body .empty-state{display:none;}
+}
 /* 2026-09-02 redesign (direct feedback: "smaller, minimalist and be able
    to fit inline, and to have more rows"): a wrapping grid, not a
    horizontal scroll strip -- flex-wrap:wrap instead of nowrap+
@@ -4278,7 +4298,7 @@ main.main-shell > .toolbar.top-app-bar{
   flex:none;
 }
 .main-shell-body{
-  flex:1 1 auto; min-height:0; overflow-y:auto;
+  flex:1 1 auto; min-height:0; overflow-y:auto; margin-bottom:6dvh;
 }
 @media (min-width:721px){
   /* No bottom bar to reserve on desktop, same as main.main-calendar. */
@@ -4884,7 +4904,18 @@ body.command-palette-open{overflow:hidden;}
 @media (max-width:720px){
    .modal-overlay{align-items:flex-end; padding:0;}
    .modal{
-     width:100%; max-width:100%; border-radius:28px 28px 0 0;
+     /* min-width:500px (base .modal rule, above) was never reset here --
+        width:100% only wins over it when the overlay itself is >=500px
+        wide, so any phone narrower than that (nearly all of them: 350-
+        430px is the common range) got a modal wider than the viewport,
+        overflowing the screen instead of filling it edge to edge.
+        min(500px, 100%) keeps 500px as a ceiling on larger phones/small
+        tablets in this breakpoint while never exceeding the true
+        available width -- the sheet now spans 350-500px on the phones
+        that width range describes, floor-less below that since a phone
+        narrower than 350px should still get a real edge-to-edge sheet,
+        not a forced-wide one. */
+     width:100%; max-width:100%; min-width:min(500px, 100%); border-radius:28px 28px 0 0;
      max-height:90vh; min-height:0; transform:translateY(100%);
      padding-bottom:env(safe-area-inset-bottom, 0px);
    }
@@ -6553,7 +6584,18 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
 }
 .page-banner-title{
   margin:0; min-width:0; color:var(--fg-primary); font-weight:700;
-  letter-spacing:-0.3px; line-height:1.2;
+  letter-spacing:-0.3px;
+  /* Line-height inverted against viewport width: tight (1.5) at a
+     roomy/full-width 1200px+ viewport, loosening to 2 as the viewport
+     shrinks toward a ~300px phone -- a wrapped multi-line title needs
+     more breathing room between lines the narrower (and therefore more
+     likely to wrap) the column gets. (100vw - 300px)/900px is a 0..1
+     ratio between the 300px and 1200px reference widths (length divided
+     by length, so it resolves to a plain unitless number, not a length --
+     mixing units directly, e.g. `2 - 100vw`, isn't valid calc()); clamp()
+     pins it at 2 below 300px and 1.5 above 1200px instead of continuing
+     to extrapolate past either reference point. */
+  line-height:clamp(1.5, calc(2 - ((100vw - 300px) / 900px) * 0.5), 2);
   font-size:clamp(1.15rem, 2.5vw, 1.6rem);
 }
 .page-banner-title .icon{width:1.15em; height:1.15em; vertical-align:-0.2em;}
