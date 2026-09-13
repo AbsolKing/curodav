@@ -326,12 +326,23 @@ EOF
 
 health_check() {
   local url="http://127.0.0.1:${TARGET_PORT}${HEALTH_PATH}"
-  local attempts=10
+  # 90s budget (45 attempts x 2s): main.py's lifespan runs a synchronous
+  # full_refresh() before uvicorn binds the port at all (one CalDAV/
+  # CardDAV round trip per published-list member, sequential -- see
+  # sync.py/published_lists.py) -- until that finishes, every attempt
+  # here gets connection-refused, not a slow response. The old 10s
+  # budget (10 x 1s) was tuned for an empty/small dataset and started
+  # false-positive rolling back healthy deploys once published lists grew
+  # (confirmed 2026-09-13: rolled back a release health-checking was still
+  # mid-startup-sync). This is a timing workaround, not a fix -- the real
+  # fix is moving full_refresh off uvicorn's startup critical path (see
+  # STATE.md).
+  local attempts=45
   for i in $(seq 1 "$attempts"); do
     if curl -fsS -o /dev/null "$url"; then
       return 0
     fi
-    sleep 1
+    sleep 2
   done
   return 1
 }
