@@ -17,6 +17,54 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- LIVE-VERIFIED this time (Claude in Chrome
+  finally reachable; navigated the real running app at
+  `http://127.0.0.1:8000/`, not just reasoned from source) closing the
+  gap the previous two entries flagged. Two things confirmed and one new
+  real bug found and fixed:
+
+  1. **label-icon-tile confirmed genuinely fixed** -- `getComputedStyle()`
+     on `/spaces/f`'s tile: `background-color: rgb(55, 120, 189)` (fully
+     opaque blue), `background-image` the rgba() sheen, rendering exactly
+     as intended. The three rounds of fixes actually worked; this is the
+     first time any of them was checked in a real browser instead of
+     reasoned from source.
+  2. **img.avatar-circle border removal confirmed** -- Home's profile
+     photo renders with no ring.
+  3. **New bug found via the user's own side-by-side screenshot** (mockup
+     vs live): the "Upcoming" widget's events looked broken -- event
+     titles ("6", "test" -- the user's own real test-event titles, not
+     fake data) were crushed into a narrow sliver against the widget's
+     right edge, date/time on the left looking like it owned most of the
+     row. Investigated instead of assumed: `getBoundingClientRect()` on
+     the live table showed the nowrap `.widget-row-time` column had been
+     given ~500px of a 679px-wide table by the browser's auto table-layout
+     algorithm, leaving the actual title column ~180px. Root cause:
+     `.widget-row-time{white-space:nowrap;}` (style.css) has no width
+     constraint -- harmless on a 3-column row (Today's Events: time/
+     title/nothing else) where nothing forces the time column to grow,
+     but on the Upcoming widget's 2-column row (no `right` cell, see
+     _widget_agenda.html) the browser handed most of the leftover table
+     width to the unconstrained nowrap column instead of the title. Fixed
+     with `width:1%` (the standard auto-table-layout "shrink this column
+     to its content, give the rest away" trick) -- live-reloaded and
+     re-verified after the fix: date and title now sit together naturally
+     on the left, as they should.
+
+  **Tests**: updated `test_dashboard_today_week_widgets.py::
+  TestUpcomingEventsDoubleLineFix` (its own old comment already flagged
+  "no browser to measure real wrapping" as a real limitation -- that
+  limitation was exactly what let this bug through unnoticed by the test
+  suite). Full suite re-verified in 4 batches under `TZ=UTC` -- **2205
+  passed, 0 failed**, unchanged count (one assertion updated, not added).
+
+  **Next slice**: the general lesson here, not just this one bug --
+  CSS-shape tests that assert on source text (a class exists, a string is
+  in a stylesheet) can't catch actual rendered layout the way this one
+  bug demonstrates. Worth considering for any future table-layout-shaped
+  widget work: check it live before calling it done, not just when a
+  screenshot forces the issue.
+
 - **Shipped:** 2026-09-13 -- third pass on the same tile, direct report
   the gradient problem persisted after both prior fixes ("check the
   chrome in browser" -- couldn't: Claude in Chrome's extension wasn't

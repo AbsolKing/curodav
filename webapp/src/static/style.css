@@ -5758,9 +5758,23 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    widget_link_row macro (_widget_items.html) attaches instead of the inline
    `style="width:26px"/"width:60px"/"width:150px"/"text-align:right"`
    attributes each widget used to hand-roll. nowrap is what actually fixes
-   a date+time column wrapping to two lines; no fixed widths. */
+   a date+time column wrapping to two lines; no fixed widths.
+
+   2026-09-13 direct fix (live-verified, Claude in Chrome): `.widget-row-
+   time` had no width constraint at all -- fine on a 3-column row (Today's
+   Events section: time / title / nothing else), where the OTHER fixed-
+   width cell implicitly bounds things, but on a 2-column row (the
+   Upcoming/all_upcoming Events section has no `right` cell -- see
+   _widget_agenda.html) the browser's table auto-layout gave the nowrap
+   time column ~500px and squeezed the actual event title into a ~180px
+   sliver jammed against the right edge, on a table only 679px wide --
+   confirmed via getBoundingClientRect() on the live page, not guessed.
+   `width:1%` is the standard auto-table-layout trick for "shrink this
+   column to its content's width, give everything else to the other
+   column(s)" -- combined with the existing nowrap it now behaves the same
+   whether or not a `right` cell happens to be present. */
 .widget-row-icon{width:26px;}
-.widget-row-time{white-space:nowrap;}
+.widget-row-time{white-space:nowrap; width:1%;}
 .widget-row-right{text-align:right;}
 .widget-config{margin-top:12px; border-top:1px solid var(--separator); padding-top:8px;}
 .widget-config summary{cursor:pointer; font-size:13px; color:var(--fg-tertiary); display:flex; align-items:center; gap:4px;}

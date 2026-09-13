@@ -141,8 +141,18 @@ class TestTodayAndWeekRetiredAsRedirects:
 
 class TestUpcomingEventsDoubleLineFix:
     def test_date_time_column_is_wide_enough_and_nowraps(self):
-        # Structural check (no browser to measure real wrapping) -- same
-        # ceiling this app's other CSS-shape tests already accept.
+        # Structural check -- this test used to note "no browser to measure
+        # real wrapping" as its own ceiling; 2026-09-13 that ceiling was
+        # actually hit and fixed live (Claude in Chrome, direct report the
+        # Upcoming widget's layout looked wrong): `.widget-row-time` had
+        # nowrap but no width, which is fine on a 3-column row (Today's
+        # Events: time/title/nothing else) but on a 2-column row (Upcoming/
+        # all_upcoming has no `right` cell) the browser's table auto-layout
+        # gave the nowrap time column ~500px of a 679px-wide table and
+        # crushed the actual event title into a ~180px sliver against the
+        # right edge -- confirmed via getBoundingClientRect() on the live
+        # page. `width:1%` (the standard auto-table-layout "shrink to
+        # content" trick) fixed it, live-confirmed after the fix too.
         # 2026-08-17 widget uniformity pass: the nowrap fix moved out of an
         # inline `width:150px` td into the shared `.widget-row-time` class
         # (style.css) the widget_link_row macro attaches, so the event-time
@@ -151,7 +161,7 @@ class TestUpcomingEventsDoubleLineFix:
         import pathlib
         templates = pathlib.Path(__file__).resolve().parents[1] / "src" / "templates"
         css = (templates.parent / "static" / "style.css").read_text()
-        assert ".widget-row-time{white-space:nowrap;}" in css
+        assert ".widget-row-time{white-space:nowrap; width:1%;}" in css
         partial = (templates / "_widget_agenda.html").read_text()
         assert "leading_class='widget-row-time'" in partial
         assert "width:110px" not in partial
