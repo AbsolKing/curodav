@@ -1,21 +1,9 @@
 #!/usr/bin/env bash
-# Installs cloudflared, creates (or reuses) a named Cloudflare Tunnel,
-# routes DOMAIN_APP's DNS at it, and runs it as a systemd service. Only
-# ONE hostname is ever routed here -- Radicale is a path under it
-# (https://DOMAIN_APP/radicale/), split off locally by nginx (../nginx/)
-# AFTER the tunnel, not a second subdomain/second DNS route.
-#
-# Replaces what a Caddy + Let's Encrypt setup would otherwise do for TLS
-# -- no cert renewal, no inbound port opened at all (see ../firewall.sh).
-# A local nginx still runs (see ../nginx/), but purely for the loopback
-# path-split; Cloudflare remains the only TLS termination point.
-#
-# Idempotent for everything except the interactive login: if
-# /root/.cloudflared/cert.pem already exists (this host is already
-# authorized against your Cloudflare account), it's reused as-is. If a
-# tunnel named TUNNEL_NAME already exists, it's reused rather than
-# recreated. DNS routes are safe to re-run (cloudflared no-ops or warns if
-# a route already points at this tunnel).
+# Installs cloudflared, creates (or reuses) a named Tunnel, routes
+# DOMAIN_APP's DNS at it, and runs it as a systemd service. Only ONE
+# hostname is ever routed -- Radicale is a path under it, split off
+# locally by nginx after the tunnel, not a second subdomain.
+# Idempotent except the interactive login (skipped if already authorized).
 set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -25,10 +13,6 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(dirname "$SCRIPT_DIR")"
-# DEPLOY_ENV_FILE env var override -- see install-radicale.sh's matching
-# comment; scripts/curodav-ctl's `run_dav_setup` sets this to the persisted
-# /srv/curodav/shared/deploy.env. Unset (manual walkthrough), falls back to
-# this release's own deploy/deploy.env exactly as before.
 ENV_FILE="${DEPLOY_ENV_FILE:-${DEPLOY_DIR}/deploy.env}"
 CF_DIR="/etc/cloudflared"
 ROOT_CF_DIR="/root/.cloudflared"
@@ -62,9 +46,8 @@ fi
 
 if [ ! -f "${ROOT_CF_DIR}/cert.pem" ]; then
   echo "==> Not yet authorized against your Cloudflare account."
-  echo "    Running 'cloudflared tunnel login' -- this prints a URL below;"
-  echo "    open it in a browser on ANY device, log in, and pick the"
-  echo "    domain/zone that owns DOMAIN_APP. Waiting..."
+  echo "    Running 'cloudflared tunnel login' -- open the printed URL in a"
+  echo "    browser, log in, and pick the zone that owns DOMAIN_APP. Waiting..."
   cloudflared tunnel login
   if [ ! -f "${ROOT_CF_DIR}/cert.pem" ]; then
     echo "==> Login didn't complete (no ${ROOT_CF_DIR}/cert.pem) -- re-run this script after authorizing." >&2
@@ -74,7 +57,6 @@ else
   echo "==> Already authorized (${ROOT_CF_DIR}/cert.pem exists)."
 fi
 
-# --- find-or-create the tunnel, then read its UUID back out -----------------
 tunnel_id() {
   cloudflared tunnel list -o json 2>/dev/null | python3 -c "
 import json, sys
@@ -144,9 +126,7 @@ else
   exit 1
 fi
 
-echo "==> Done. Once DNS has propagated (usually near-instant on Cloudflare):"
+echo "==> Done. Once DNS has propagated:"
 echo "      https://${DOMAIN_APP}/          -> localhost:8080 (nginx) -> localhost:8000 (curodav)"
 echo "      https://${DOMAIN_APP}/radicale/ -> localhost:8080 (nginx) -> localhost:5232 (radicale)"
-echo "    (run ../nginx/install-nginx.sh first if you haven't -- nginx doesn't"
-echo "    need to be up for THIS script to succeed, but requests will 502"
-echo "    until it is)"
+echo "    (run ../nginx/install-nginx.sh first if you haven't -- requests will 502 until it is)"
