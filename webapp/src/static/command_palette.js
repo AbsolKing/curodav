@@ -150,6 +150,47 @@
 
   const TYPE_ICON = { task: "check-square", event: "calendar", contact: "user", note: "file-text", page: "layout" };
 
+  // "Turn on/off Edit mode" (2026-09-13, direct request: "a way to
+  // activate edit mode with the help of the command palette") -- a
+  // virtual, client-only row alongside global mode's "Create task/
+  // event: ..." rows above (buildRows), not a real /api/search result:
+  // there's nothing to search for server-side, this just surfaces an
+  // app-wide setting (Settings > Appearance's own toggle, routers/
+  // settings.py's set_edit_mode) as a quick action. Current on/off state
+  // comes from body[data-edit-mode] (deps.py's edit_mode_enabled()
+  // Jinja global, threaded onto every page via base.html), so this works
+  // the same everywhere the palette itself works, not just on pages that
+  // render the widget grid.
+  function editModeOn() {
+    return document.body.getAttribute("data-edit-mode") === "1";
+  }
+
+  function toggleEditMode() {
+    const turningOn = !editModeOn();
+    fetch("/settings/edit-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Requested-With": "fetch" },
+      body: "enabled=" + (turningOn ? "1" : ""),
+    })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error("failed");
+        close();
+        toast({ title: "Edit mode " + (turningOn ? "on" : "off") });
+        // The current page may render the widget grid (Dashboard/Space/
+        // Project/Label) with its edit controls baked into server-
+        // rendered HTML (routers/dashboard.py's widget_page_context) --
+        // simplest way to pick that up immediately, everywhere the
+        // palette can be opened from, is a full reload rather than
+        // trying to detect "does this page support edit mode" client-
+        // side. A page that doesn't render the grid just reloads with
+        // no visible change beyond the toast already shown.
+        window.location.reload();
+      })
+      .catch(function () {
+        toast({ message: "Could not change Edit mode.", variant: "error" });
+      });
+  }
+
   function iconMarkup(name) {
     return '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
   }
@@ -276,6 +317,9 @@
     });
     if (mode === "relation" && q) {
       rows.push({ kind: "create", index: rows.length, title: q });
+    }
+    if (mode === "global" && q && "edit mode".indexOf(q.toLowerCase()) !== -1) {
+      rows.push({ kind: "toggle-edit-mode", index: rows.length });
     }
     if (mode === "global" && q) {
       rows.push({ kind: "create-task", index: rows.length, title: q });
@@ -442,6 +486,15 @@
           escapeHtml(relationCtx.label || "item") + ': "' + escapeHtml(row.title) + '"</span></span>';
         el.addEventListener("click", function () {
           submitRelation("__new__", row.title);
+        });
+      } else if (row.kind === "toggle-edit-mode") {
+        const turningOn = !editModeOn();
+        el.innerHTML =
+          iconMarkup("edit") +
+          '<span class="command-palette-row-text"><span class="command-palette-row-title">Turn ' +
+          (turningOn ? "on" : "off") + " Edit mode</span></span>";
+        el.addEventListener("click", function () {
+          toggleEditMode();
         });
       } else if (row.kind === "create-task" || row.kind === "create-event") {
         const typeLabel = row.kind === "create-task" ? "task" : "event";

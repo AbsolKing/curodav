@@ -17,6 +17,49 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request: "a way to activate edit
+  mode with the help of the command palette search thing." Edit mode
+  (Settings > Appearance's persistent toggle, EDIT_MODE_KEY) previously
+  had exactly one entry point: that Settings page's on/off segmented
+  control. Added a virtual "Turn on/off Edit mode" row to the command
+  palette's global mode (static/command_palette.js) -- appears when the
+  typed query is a substring of "edit mode" ("edit", "mode", etc.),
+  alongside the existing "Create task/event: ..." rows. Picking it POSTs
+  to `/settings/edit-mode` and reloads the current page so its edit
+  controls (if the page renders the widget grid at all) show up
+  immediately, rather than navigating to Settings.
+
+  Three supporting pieces, since Edit mode's state previously only
+  reached routes that explicitly called routers/dashboard.py's
+  `widget_page_context` (Dashboard/Space/Project/Label) -- the command
+  palette itself lives in base.html, rendered on every page:
+  1. New Jinja global `deps.edit_mode_enabled(request)` (mirrors
+     `_show_label_icons`'s per-request-memoized app_meta pattern) so any
+     template can read the current state.
+  2. `base.html`'s `<body>` now carries `data-edit-mode="1"/""`, read by
+     command_palette.js's `editModeOn()` instead of a fetch round-trip.
+  3. `POST /settings/edit-mode` (routers/settings.py's `set_edit_mode`)
+     is dual-mode now (deps.py's `respond`/`wants_json`, the same
+     async-CRUD pattern every task/event mutation already uses) --
+     returns JSON when the palette calls it with `X-Requested-With:
+     fetch`, still redirects to `/settings/appearance` for the plain
+     `<form>` on that page.
+
+  **Tests**: `deps._edit_mode_enabled` covered the same way as
+  `_show_label_icons` (`TestEditModeEnabledGlobal`,
+  test_display_prefs_settings.py); `set_edit_mode`'s new dual-mode JSON
+  path covered alongside its existing redirect-mode tests
+  (`TestSettingsAppearanceEditMode`). No JS-side test coverage for
+  command_palette.js's own new row/click handler -- same known gap this
+  suite already accepts for the rest of that file (see
+  test_command_palette_actions.py's own docstring). Full suite
+  re-verified in 12 batches under `TZ=UTC` -- **2210 passed, 0 failed**
+  (2205 + 5 new tests).
+
+  **Not live-verified** -- no Claude in Chrome connection this session;
+  worth a quick real-browser check next time it's reachable (type "edit"
+  into Ctrl-K, confirm the row appears and actually flips the toggle).
+
 - **Shipped:** 2026-09-13 -- direct request following the previous
   entry's live-verification session: "the events style inside widget to
   be similar to tasks (date as a pill, title first, date second, circle
