@@ -30,6 +30,19 @@
 // inline status pill uses (field=status) -- one endpoint, two UIs. Reverts
 // (reloads) only on a network/server failure, same failure handling as
 // tasks_table.js.
+//
+// 2026-09-13 (direct request, "easier drag and drop -- drag a card from any
+// point, drop anywhere in the column, even on its header"): dragging from
+// any point on the card was already true -- pointerdown below is bound to
+// the whole `.kanban-card`, not a handle -- so the only real gap was the
+// drop side. `columnAtPoint` used to resolve `.closest(".kanban-cards")`,
+// and `.kanban-column-head` is a SIBLING of `.kanban-cards` (not inside
+// it, see project_detail.html's markup) -- so a pointer over the header
+// resolved to nothing and a drop there was a silent no-op. Now resolves
+// `.closest(".kanban-column")` instead (covers the header too), and
+// `endDrag` looks up that column's own `.kanban-cards` child as the actual
+// append target -- `.kanban-column` itself also wraps the header, so
+// appending straight into it would put the card outside the card list.
 
 (function () {
   const board = document.getElementById("kanban-board");
@@ -47,7 +60,7 @@
     dragCard.style.visibility = "hidden"; // don't let the dragged card itself be the hit result
     const el = document.elementFromPoint(x, y);
     dragCard.style.visibility = "";
-    return el ? el.closest(".kanban-cards") : null;
+    return el ? el.closest(".kanban-column") : null;
   }
 
   function setHoverColumn(column) {
@@ -86,21 +99,22 @@
     if (hoverColumn) hoverColumn.classList.remove("drop-hover");
 
     if (drop && hoverColumn) {
-      const fromColumn = card.closest(".kanban-cards");
-      const column = hoverColumn;
+      const fromCards = card.closest(".kanban-cards");
+      const column = hoverColumn; // .kanban-column -- may have been dropped on its header
+      const toCards = column.querySelector(".kanban-cards");
       const newStatus = column.dataset.status;
       const uid = card.dataset.uid;
 
-      if (fromColumn !== column) {
-        const emptyEl = column.querySelector(".kanban-empty");
+      if (toCards && fromCards !== toCards) {
+        const emptyEl = toCards.querySelector(".kanban-empty");
         if (emptyEl) emptyEl.remove();
-        column.appendChild(card);
+        toCards.appendChild(card); // always append into the column's card list, even when dropped on its header
         updateCounts();
-        if (fromColumn && !fromColumn.querySelector(".kanban-card")) {
+        if (fromCards && !fromCards.querySelector(".kanban-card")) {
           const empty = document.createElement("div");
           empty.className = "kanban-empty";
           empty.textContent = "No tasks";
-          fromColumn.appendChild(empty);
+          fromCards.appendChild(empty);
         }
         persistMove(uid, newStatus);
       }

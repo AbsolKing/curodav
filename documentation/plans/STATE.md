@@ -17,6 +17,58 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (2 of 9 in the same "before
+  v2.2.0 release" batch as the entry below): "the kanban board should
+  allow for easier drag and drop (drag a card from any point, drop
+  anywhere in the column even on its header); columns shouldn't have a
+  fixed size, each should match the tallest column on the same row so
+  drag-and-drop within a row doesn't need vertical mouse movement."
+  "Drag from any point" turned out to already be true -- `tasks_board.js`'s
+  pointerdown is bound to the whole `.kanban-card`, never a handle -- no
+  code change needed there, just confirmed by reading the file.
+
+  The real gap was the drop side: `columnAtPoint` resolved
+  `.closest(".kanban-cards")`, and `.kanban-column-head` is a SIBLING of
+  `.kanban-cards` (not nested inside it), so hovering/dropping on a
+  column's header resolved to nothing and silently did nothing. Now
+  resolves `.closest(".kanban-column")` (covers the header), and `endDrag`
+  looks up that column's own `.kanban-cards` child as the actual append
+  target (`fromCards`/`toCards`, renamed from the old single
+  `fromColumn`/`column` pair for clarity) -- appending straight into
+  `.kanban-column` itself would've put the card outside the card list,
+  since the column also wraps the header.
+
+  Equal-height columns: `.kanban-board`'s `align-items:flex-start` was
+  overriding flex's own `stretch` default, which is why each column only
+  ever sized to its own content -- dropping that declaration (stretch
+  needs no explicit value) makes every column in the same flex line
+  (== each visual row, both before and after the two `@container`
+  wrap tiers) stretch to the tallest column in that row, for free, no new
+  rule needed. Added `flex:1` to `.kanban-cards` so the card list itself
+  fills the extra height (cosmetic -- the drop target was already the
+  whole stretched `.kanban-column` regardless). Moved the drop-highlight
+  rule from `.kanban-cards.drop-hover` to `.kanban-column.drop-hover` to
+  match the widened drop target, and moved its `transition:background`
+  onto `.kanban-column`'s own base rule (a transition only declared on
+  the hover-state rule doesn't reliably animate the state change).
+
+  **Tests**: `tests/test_project_detail.py` alone first (44 passed --
+  `test_board_markup_matches_the_scripts_own_selectors`'s
+  `.closest(".kanban-cards")` substring check still holds, that call
+  still exists in the file as `fromCards`), then full suite in the same
+  12-chunk split as the entry above -- 2,219 passed, 0 failed
+  (`test_caldav_bridge_live.py` excluded as always). No JS/CSS harness
+  exists in this suite (recurring note in this file) so the drag/drop and
+  stretch behavior itself is validated by source reasoning, not a
+  simulated-pointer-sequence or computed-style assertion.
+
+  **Not live-verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should confirm on a
+  real board with an uneven column-length mix that (a) columns visibly
+  stretch to match the tallest in their row at all three `@container`
+  tiers, and (b) dropping directly on a column's header actually moves
+  the card.
+
 - **Shipped:** 2026-09-13 -- direct request (1 of 9 in a "before v2.2.0
   release" batch, user confirmed sequential one-slice-per-session handling
   for the whole batch): "the agenda for projects should be updated to the

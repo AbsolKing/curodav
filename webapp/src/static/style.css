@@ -2417,7 +2417,19 @@ tr:hover .task-row-delete, tr:focus-within .task-row-delete{opacity:1;}
    `@container` rules something specific to target rather than the
    nearest ancestor container generically. */
 .kanban-board-wrap{container-type:inline-size; container-name:kanban;}
-.kanban-board{display:flex; gap:var(--space-3); overflow-x:auto; padding-bottom:var(--space-1); align-items:flex-start;}
+/* 2026-09-13 (direct request: "drop anywhere in the column, even on its
+   header... columns should be the same size as the longest column on the
+   same row, so drag and drop would work for the same row without moving
+   the mouse vertically") -- `align-items:flex-start` (the previous value)
+   overrode flex's own default of `stretch`, which is why each column used
+   to size to only its own content; dropping that declaration (stretch is
+   the default, no explicit value needed) makes every column in a flex
+   LINE -- i.e. each visual row, both before and after `flex-wrap` kicks in
+   at the two narrower `@container` tiers below -- stretch to the tallest
+   column in that row. `.kanban-column` has no explicit height of its own,
+   so this is a pure consequence of the flex default, no extra rule
+   needed. */
+.kanban-board{display:flex; gap:var(--space-3); overflow-x:auto; padding-bottom:var(--space-1);}
 /* 2026-08-08 -- columns are responsive now: each grows/shrinks with the
    page width so the board fills the viewport without a horizontal scroll
    whenever the columns can actually fit side by side. 340px is the
@@ -2433,11 +2445,21 @@ tr:hover .task-row-delete, tr:focus-within .task-row-delete{opacity:1;}
   flex:1 1 0; min-width:240px; max-width:340px;
   background:var(--bg-secondary); border-radius:var(--radius-md); padding:var(--space-2);
   display:flex; flex-direction:column; gap:var(--space-2); min-height:80px;
+  transition:background var(--dur-fast) var(--ease-standard);
 }
 .kanban-column-head{display:flex; align-items:center; justify-content:space-between; padding:2px 2px var(--space-1);}
 .kanban-count{font-size:var(--text-caption); color:var(--fg-tertiary); font-weight:600;}
-.kanban-cards{display:flex; flex-direction:column; gap:var(--space-2); min-height:40px; border-radius:var(--radius-sm); transition:background var(--dur-fast) var(--ease-standard);}
-.kanban-cards.drop-hover{background:var(--accent-neutral-subtle);}
+/* flex:1 (added alongside the equal-height column change above) lets the
+   card list itself fill a column stretched taller than its own content --
+   without it the drop-hover highlight below would leave a plain unhovered
+   gap under a short column's last card even while that whole column (now
+   the actual drop target, .kanban-column via tasks_board.js) is a valid
+   drop zone. */
+.kanban-cards{display:flex; flex:1; flex-direction:column; gap:var(--space-2); min-height:40px; border-radius:var(--radius-sm);}
+/* Drop-hover now highlights the whole column (2026-09-13, drop target
+   widened from `.kanban-cards` to `.kanban-column` in tasks_board.js so a
+   drop on the column header works too) -- was `.kanban-cards.drop-hover`. */
+.kanban-column.drop-hover{background:var(--accent-neutral-subtle);}
 .kanban-card{
   background:var(--bg-elevated); border:none; border-radius:var(--radius-control);
   padding:var(--space-2) var(--space-3); box-shadow:var(--elevation-1); display:flex; flex-direction:column; gap:var(--space-1);
