@@ -262,8 +262,24 @@ def _labels_context(conn, request: Request) -> dict:
         if lbl.get("is_project"):
             lbl["project_status"] = db.project_status(conn, lbl)
 
-    # Return flat list sorted by name for the new table design
-    labels.sort(key=lambda l: l["name"].lower())
+    # 2026-09-13 (direct request, 9 of 9 in a "before v2.2.0 release"
+    # batch: "the label table inside settings should be sorted by Groups
+    # first, then by type (space first, then projects, then plain), then
+    # alphabetically") -- was flat-alphabetical-by-name only. `_label_role`
+    # below already encodes the exact mutually-exclusive type a label can
+    # have; `_ROLE_SORT_RANK` maps it to the requested space/project/plain
+    # ordering (deliberately not the same order `_label_role` computes
+    # its own precedence in -- that function's "is_project wins if both
+    # flags are somehow set" is about resolving ambiguity, unrelated to
+    # what order the three buckets should sort in here). `label_group` is
+    # the primary key ("Groups first"), so every label sharing a group
+    # sits together, sub-sorted by type then name within it; ungrouped
+    # rows (`label_group` empty/None) happen to land before any named
+    # group purely because `"" < "Anything"` in Python's default string
+    # ordering -- no direction ("ungrouped first" vs "last") was specified
+    # in the request, this is just `sorted()`'s natural behavior for the
+    # tuple key below, not a deliberate call either way.
+    labels.sort(key=lambda l: ((l.get("label_group") or "").lower(), _ROLE_SORT_RANK[_label_role(l)], l["name"].lower()))
 
     return {
         "request": request,
@@ -288,6 +304,15 @@ def _label_role(cfg: dict) -> str:
     if cfg.get("generate_space"):
         return "space"
     return "none"
+
+
+# 2026-09-13: sort-order weights for _labels_context's Settings > Labels
+# table sort (direct request: "space first, then projects, then plain") --
+# a separate mapping from _label_role's own return values rather than
+# hardcoding numbers inline at the one call site, so the requested order
+# reads directly off this table instead of needing _label_role's docstring
+# cross-referenced to see what "space"/"project"/"none" even mean here.
+_ROLE_SORT_RANK = {"space": 0, "project": 1, "none": 2}
 
 
 @router.get("/{name}/edit")

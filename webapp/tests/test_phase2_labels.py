@@ -622,3 +622,52 @@ class TestSystemLabelsExcludedFromThePicker:
         db.set_object_labels(conn, "task", "t1", ["Birthday", "Habit", "Focus"])
         assert db.list_tag_names_in_use(conn) == ["Focus"]
 
+
+class TestSettingsLabelsTableSortOrder:
+    """2026-09-13 direct request, last of a 9-item pre-v2.2.0 batch: "the
+    label table inside settings should be sorted by Groups first, then by
+    type (space first, then projects, then plain), then alphabetically."
+    Was flat-alphabetical-by-name only (routers/labels.py::_labels_context
+    used to override db.list_labels's own name-only sort with an
+    identical one). No prior test asserted row order here."""
+
+    def _label(self, conn, name, group="", role="none"):
+        db.upsert_label_config(conn, {
+            "name": name,
+            "label_group": group or None,
+            "generate_space": 1 if role == "space" else 0,
+            "is_project": 1 if role == "project" else 0,
+            "created_at": _now(),
+        })
+
+    def _order(self, conn):
+        ctx = labels_router._labels_context(conn, _request("/settings/labels"))
+        return [l["name"] for l in ctx["labels"]]
+
+    def test_type_order_within_the_same_group_is_space_then_project_then_plain(self, conn):
+        self._label(conn, "Zebra Project", group="Work", role="project")
+        self._label(conn, "Alpha Space", group="Work", role="space")
+        self._label(conn, "Middle Plain", group="Work", role="plain")
+        assert self._order(conn) == ["Alpha Space", "Zebra Project", "Middle Plain"]
+
+    def test_alphabetical_within_the_same_group_and_type(self, conn):
+        self._label(conn, "Zebra", group="Work")
+        self._label(conn, "Alpha", group="Work")
+        self._label(conn, "Middle", group="Work")
+        assert self._order(conn) == ["Alpha", "Middle", "Zebra"]
+
+    def test_group_is_the_primary_sort_key_above_type_and_name(self, conn):
+        # A plain label in an earlier (alphabetically) group sorts before
+        # a Space-type label in a later group -- Group beats type/name.
+        self._label(conn, "Owns the Zoo group", group="Zoo", role="plain")
+        self._label(conn, "In Aardvark space", group="Aardvark", role="space")
+        assert self._order(conn) == ["In Aardvark space", "Owns the Zoo group"]
+
+    def test_manage_labels_route_renders_in_the_sorted_order(self, conn):
+        # End-to-end through the actual route, not just the helper --
+        # confirms the sort survives all the way to the template context.
+        self._label(conn, "Zebra Project", group="Work", role="project")
+        self._label(conn, "Alpha Space", group="Work", role="space")
+        resp = labels_router.manage_labels(_request("/settings/labels"), conn=conn)
+        assert [l["name"] for l in resp.context["labels"]] == ["Alpha Space", "Zebra Project"]
+

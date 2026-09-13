@@ -17,6 +17,58 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (9 of 9, closing out the
+  "before v2.2.0 release" batch): "the label table inside settings should
+  be sorted by Groups first, then by type (space first, then projects,
+  then plain), then alphabetically." Was flat alphabetical-by-name only --
+  `routers/labels.py::_labels_context` called `db.list_labels` (itself
+  just `sorted(names, key=str.lower)`) and then re-sorted by name again
+  anyway (`labels.sort(key=lambda l: l["name"].lower())`, a leftover from
+  an earlier table redesign per its own inline comment). Replaced that
+  second sort with a composite key: `(label_group or "", type rank, name)`
+  all lowercased. Type rank is a new `_ROLE_SORT_RANK = {"space": 0,
+  "project": 1, "none": 2}` dict, mapped through the existing
+  `_label_role(cfg)` helper (already encoded the right mutually-exclusive
+  space/project/none classification, just never used for ordering before)
+  -- deliberately a separate mapping from `_label_role`'s own internal
+  precedence rule ("is_project wins if both flags are somehow set", about
+  resolving an ambiguous row, unrelated to bucket sort order). Ungrouped
+  rows land before any named group purely because `"" < "Anything"` in
+  Python's default string comparison -- no direction was specified in the
+  request for that case, so this is `sorted()`'s natural behavior, not a
+  deliberate design choice. Table itself stays a flat `<tr>` list (both
+  `labels_manage.html` and the async-CRUD `_labels_table_body.html`
+  fragment already render that way, `label_group` shown only as a
+  per-row badge) -- this is a pure ordering change, no template/markup
+  edits needed.
+
+  **Tests**: new `TestSettingsLabelsTableSortOrder` class in
+  `test_phase2_labels.py` (4 tests, no prior test asserted row order
+  here) -- confirms type order within one group (space, then project,
+  then plain), alphabetical order within one group+type, that Group beats
+  type/name as the primary key (a plain label in an earlier group sorts
+  before a Space label in a later group), and an end-to-end check through
+  the real `manage_labels` route (not just the `_labels_context` helper).
+  Ran the file alone first (55 passed), then full suite in the same
+  12-chunk split as every entry above -- 2,231 passed (2,227 + the 4 new
+  tests), 0 failed (`test_caldav_bridge_live.py` excluded as always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should open
+  Settings > Labels with a real mix of grouped/ungrouped and space/
+  project/plain labels to confirm the new ordering reads the way this
+  request intended.
+
+  **Batch note**: this closes the 9-item "before v2.2.0 release" request
+  Peter opened this session with (confirmed up front via
+  AskUserQuestion to run sequentially, one slice/commit/STATE.md update
+  each, matching this file's own discipline rather than batching). All 9
+  are now shipped or verified-already-working (see the 8 entries above
+  this one, same date). `pyproject.toml` was deliberately NOT bumped to
+  2.2.0 as part of this -- these were nine standalone direct requests
+  framed as "before the release," not a confirmation that the release
+  itself is scoped/complete; that call is Peter's to make.
+
 - **Shipped:** 2026-09-13 -- direct request (8 of 9 in the same "before
   v2.2.0 release" batch): "the Birthday label should be hidden, as well
   for the habits one, because they are not intended to be applied by the
