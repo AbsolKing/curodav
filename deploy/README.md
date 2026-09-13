@@ -63,6 +63,38 @@ generate correctly-prefixed links in its own WebDAV responses (see
 `nginx/curodav.nginx.conf.template`'s own comments for why getting this
 backwards silently breaks a DAVx5 client's follow-up requests).
 
+## How automated this is
+
+`curodav-ctl install --dav` (below) does essentially everything itself.
+Fully automated, no input needed: installing `cloudflared` from
+Cloudflare's apt repo, creating (or reusing, if one with that name
+already exists) the named Tunnel via the Cloudflare API, routing DNS for
+your domain at that tunnel (`cloudflared tunnel route dns` creates the
+actual CNAME record in your Cloudflare zone -- you never touch the DNS
+dashboard), rendering `cloudflared/config.yml`, creating dedicated
+unprivileged system users, installing/enabling all three systemd units,
+and locking the firewall down to SSH-only. Radicale and nginx get the
+same treatment: user, venv/package install, config, systemd unit, all
+scripted.
+
+Two things need a human, both one-time per host: your domain's
+nameservers have to already point at Cloudflare (see "Prerequisites"
+below -- the script can't register a domain or change nameservers for
+you), and the very first run pauses for `cloudflared tunnel login`,
+which prints a URL you open in a browser to authorize this host against
+your Cloudflare account. That authorization persists
+(`/root/.cloudflared/cert.pem`), so every later run skips straight past
+it.
+
+The rest is interactive but trivial: it prompts for the public hostname,
+tunnel name, and Radicale username (remembering your previous answers as
+defaults, so re-running to fix a typo doesn't mean retyping everything),
+plus a Radicale password the first time. The whole thing is safe to
+re-run any time -- it detects what already exists (repo, tunnel, DNS
+route, Radicale account, systemd units) and only does the work that's
+actually still missing, rather than tearing anything down and starting
+over.
+
 ## Prerequisites
 
 1. **A domain already onboarded to your Cloudflare account** (its
