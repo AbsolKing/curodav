@@ -156,14 +156,28 @@ class TestUpcomingEventsDoubleLineFix:
         # 2026-08-17 widget uniformity pass: the nowrap fix moved out of an
         # inline `width:150px` td into the shared `.widget-row-time` class
         # (style.css) the widget_link_row macro attaches, so the event-time
-        # column can no longer wrap to two lines -- assert the class exists
-        # in the CSS and the agenda template actually uses it.
+        # column can no longer wrap to two lines -- assert the class still
+        # exists in the CSS (other widgets -- weekly_schedule,
+        # scheduled_work_today, project_detail's own Agenda card -- still
+        # use it for a leading date/time column).
+        #
+        # 2026-09-13 (direct request: "the events style inside widget to be
+        # similar to tasks -- date as a pill, title first, date second,
+        # circle dot like in mockup") -- the Agenda WIDGET's own Events
+        # section (_widget_agenda.html) no longer uses `widget-row-time` at
+        # all: it moved to the same dot-leading/title/right-pill shape the
+        # Tasks section above it already uses (widget_event_dot() in the
+        # `widget-row-icon` slot, date/time as a `widget_pill(...)` on the
+        # right) -- sidesteps the whole "unconstrained nowrap column" class
+        # of bug this test's docstring above describes, since
+        # `widget-row-icon` already has a fixed 26px width.
         import pathlib
         templates = pathlib.Path(__file__).resolve().parents[1] / "src" / "templates"
         css = (templates.parent / "static" / "style.css").read_text()
         assert ".widget-row-time{white-space:nowrap; width:1%;}" in css
         partial = (templates / "_widget_agenda.html").read_text()
-        assert "leading_class='widget-row-time'" in partial
+        assert "leading_class='widget-row-time'" not in partial
+        assert "widget_event_dot()" in partial
         assert "width:110px" not in partial
         # no widget should hand-roll a fixed-width cell any more (the
         # spaces_projects progress fill's `style="width:{{ ... }}%"` is a

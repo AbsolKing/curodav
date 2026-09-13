@@ -17,6 +17,40 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request following the previous
+  entry's live-verification session: "the events style inside widget to
+  be similar to tasks (date as a pill, title first, date second, circle
+  dot like in mockup etc)." The Agenda widget's Events section
+  (`_widget_agenda.html`, both the `range=='today'` and other-range
+  branches) used to render date/time as the LEADING (left) cell and the
+  title as the only other cell, no `right` cell at all -- backwards from
+  the Tasks section immediately above it (title left, a pill on the
+  right) and from the mockup. Now matches Tasks exactly: a new
+  `widget_event_dot()` macro (`_widget_items.html`) renders a small
+  accent-colored dot in the same `widget-row-icon` leading slot a task's
+  checkbox occupies, title is the main link text, and the date/time
+  renders as a `widget_pill(..., 'blue')` on the right -- same shape,
+  same column rhythm. Also sidesteps the whole "unconstrained nowrap
+  column" bug class fixed in the previous entry for this specific row
+  shape, since `widget-row-icon` already has a fixed 26px width -- no
+  column left unconstrained to run away with the table's space.
+
+  Scoped to `_widget_agenda.html` only -- `weekly_schedule`,
+  `scheduled_work_today`, and project_detail's own built-in Agenda card
+  all still use the old `widget-row-time` leading-cell shape for their
+  own event/task rows; not touched, wasn't part of what was compared
+  against the mockup.
+
+  **Live-verified** (Claude in Chrome, `/spaces/f`) immediately after:
+  dot + title + blue date pill, matching the Tasks row above it.
+
+  **Tests**: `TestUpcomingEventsDoubleLineFix` updated -- asserts
+  `_widget_agenda.html` no longer uses `widget-row-time` and does use
+  `widget_event_dot()`; `.widget-row-time`'s own CSS assertion kept
+  as-is (the class itself still exists, other widgets still use it).
+  Full suite re-verified in 4 batches under `TZ=UTC` -- **2205 passed, 0
+  failed**, unchanged count (one assertion updated, not added).
+
 - **Shipped:** 2026-09-13 -- LIVE-VERIFIED this time (Claude in Chrome
   finally reachable; navigated the real running app at
   `http://127.0.0.1:8000/`, not just reasoned from source) closing the

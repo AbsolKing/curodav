@@ -5776,6 +5776,15 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
 .widget-row-icon{width:26px;}
 .widget-row-time{white-space:nowrap; width:1%;}
 .widget-row-right{text-align:right;}
+/* Event row leading marker (2026-09-13, direct request: "circle dot like
+   in mockup") -- sits in the same `.widget-row-icon` 26px slot a task's
+   checkbox occupies, so an Agenda widget's Overdue/Tasks/Events rows all
+   line up in the same column rhythm even though an event has nothing to
+   click there. Sized/colored like the mockup's own `.dot-evt`. */
+.widget-event-dot{
+  display:inline-block; width:7px; height:7px; border-radius:50%;
+  background:var(--accent);
+}
 .widget-config{margin-top:12px; border-top:1px solid var(--separator); padding-top:8px;}
 .widget-config summary{cursor:pointer; font-size:13px; color:var(--fg-tertiary); display:flex; align-items:center; gap:4px;}
 .widget-checkbox-row{display:flex; flex-wrap:wrap; gap:4px 14px;}
