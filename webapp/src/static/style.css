@@ -4050,10 +4050,44 @@ main.main-calendar .month-week-grid{flex:1 1 0;}
   /* Grab handle -- same drag-to-dismiss affordance/markup pattern as
      #modal-handle (style.css's own .modal-handle rule, static/modal.js),
      hidden on desktop (base rule further up sets display:none) and shown
-     here only. */
+     here only.
+     2026-09-13 (direct report: "doesn't allow to be dragged down to
+     close"). #modal-handle sits OUTSIDE its sheet's scrollable region
+     (a sibling of .modal-body, which alone scrolls) -- this handle is the
+     opposite: the very first child INSIDE .tabbar, and .tabbar itself is
+     the overflow-y:auto scrollport (it has to be; there's no separate
+     inner wrapper for the Spaces/Projects tree). Two consequences a
+     plain 36x4px pointerdown target doesn't survive: (1) the touchable
+     box was literally 4px tall, worse odds of a thumb landing on it than
+     #modal-handle's identically-sized box gets, since that one at least
+     isn't fighting a sibling scroll gesture for the same pixels; (2)
+     being a normal (not sticky) flex child, it scrolls away with the
+     list the moment a Spaces tree is tall enough to need scrolling --
+     "grab the top of the sheet" stops being reachable at all once the
+     user has scrolled down.
+     Fix, CSS-only (no JS/markup change -- static/mobile_nav_drawer.js
+     still binds pointerdown/move/up to this same #mobile-nav-handle
+     id): `position:sticky;top:0` pins it to the scrollport's top edge
+     regardless of scroll offset (the ancestor .tabbar IS the nearest
+     scrolling container sticky needs), and the box itself grows to a
+     real 28px touch target with the small pill drawn via ::before
+     instead of being the box -- the visible affordance stays the same
+     size, only the invisible hit/drag area around it grows. An opaque
+     background is required once it's sticky (not optional polish): with
+     the list scrolled down, list rows now pass underneath this pinned
+     row, and without a background they'd show through it. z-index:1
+     lifts it above those scrolling rows within .tabbar's own stacking
+     context (unrelated to the page-level z-index scale further up this
+     file -- purely local, siblings only). */
   .mobile-nav-handle{
-    display:block; width:36px; height:4px; border-radius:var(--radius-pill); background:var(--border-strong);
-    margin:var(--space-2) auto var(--space-1); flex:none; touch-action:none;
+    display:flex; align-items:center; justify-content:center;
+    position:sticky; top:0; z-index:1;
+    width:100%; height:28px; margin:0; flex:none; touch-action:none;
+    background:var(--bg-elevated);
+  }
+  .mobile-nav-handle::before{
+    content:""; display:block; width:36px; height:4px;
+    border-radius:var(--radius-pill); background:var(--border-strong);
   }
   /* No separate collapse/expand state exists at this width -- the drawer
      is always the "expanded" look, so the desktop toggle/app-name header

@@ -17,6 +17,64 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct report: "the mobile-nav-drawer doesn't
+  allow to be dragged down to close." (Same report also flagged two other
+  mobile-touch issues, deliberately NOT built this slice per direct
+  instruction to do one at a time: calendar drag-and-drop needs a
+  hold-before-drag gesture so events stop being nudged by accident --
+  confirmed the drag itself already works and doesn't fight page scroll,
+  it's just too easy to trigger; and table row-select checkboxes should be
+  hidden on mobile in favor of long-press-to-select. Both left as clear
+  follow-ups, not investigated further.)
+
+  Root cause (found by static analysis + comparing against `#modal-handle`,
+  the known-working reference the drawer's own code comments say it copies
+  -- no live device/browser was available in this sandbox to reproduce
+  directly: Claude in Chrome runs on a different machine than this
+  session's sandbox, so it can't reach the sandbox's `127.0.0.1:8000` dev
+  server, and the Chrome extension's `navigate` tool refuses `file://`
+  URLs outright ("Can't interact with browser internal pages"). Documented
+  here so a future session doesn't re-attempt the same dead end):
+  `#modal-handle` sits OUTSIDE its sheet's scrollable region (a sibling of
+  `.modal-body`, which alone scrolls), but `#mobile-nav-handle` is the
+  first child INSIDE `.tabbar` -- and `.tabbar` itself is the
+  `overflow-y:auto` scrollport for the whole drawer (Spaces/Projects tree
+  included, no separate inner wrapper exists to scroll instead). Two
+  consequences: the touchable box was a literal 36x4px sliver, much
+  smaller odds of a thumb landing on it than the equally-sized
+  `#modal-handle` gets since that one isn't also fighting a sibling
+  scroll gesture for the same pixels; and being a plain (non-sticky) flex
+  child, it scrolls away with the list the moment the Spaces tree is tall
+  enough to scroll -- "grab the top of the sheet" stops being reachable at
+  all past that point.
+
+  Fix is CSS-only, `.mobile-nav-handle` in `style.css`'s mobile breakpoint
+  -- no JS/markup change, `static/mobile_nav_drawer.js` still binds
+  pointerdown/move/up to the same `#mobile-nav-handle` id it always did:
+  `position:sticky;top:0` pins the handle to the scrollport's own top edge
+  regardless of scroll offset (`.tabbar` is the nearest scrolling
+  ancestor sticky needs), the box itself grows to a real 28px touch
+  target with the small visible pill drawn via `::before` instead of
+  being the box (affordance looks identical, only the invisible hit/drag
+  area grows), and an opaque `background:var(--bg-elevated)` plus
+  `z-index:1` (local to `.tabbar`'s own stacking context, unrelated to the
+  page-level z-index scale) keep scrolled-past list rows from showing
+  through or stacking above the now-pinned handle.
+
+  **Tests**: full suite run in 4 parallel chunks by test file (same
+  approach as the session below, this sandbox's per-bash-call 45s ceiling
+  makes the ~2,200-test full run time out otherwise) -- 2,219 passed, 0
+  failed (`test_caldav_bridge_live.py` excluded as always). No JS/CSS
+  harness exists in this suite (recurring note in this file), so the fix
+  itself is validated by source/cascade reasoning, not a computed-style or
+  drag-simulation assertion.
+
+  **Not live-verified**: same sandbox-can't-reach-a-real-browser
+  limitation as above -- next session (or Peter, on a real phone) should
+  confirm the drag-to-close gesture actually feels right once this is
+  deployed, before assuming the sticky/bigger-hit-target fix fully closes
+  the report.
+
 - **Shipped:** 2026-09-13 -- same-day follow-up direct request: "could you
   continue with fixing the lack of brute force protection?" (Radicale's
   own auth has none -- flagged but deliberately left out of the config-
