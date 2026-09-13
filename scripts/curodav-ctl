@@ -557,6 +557,21 @@ cmd_update() {
   log "Cloning ${repo_url} (${GIT_BRANCH})..."
   git clone --depth 1 --branch "$GIT_BRANCH" "$repo_url" "$tmp_clone"
 
+  # Refresh /usr/local/bin's installed copy from THIS fresh clone, not via
+  # self_install (which copies whatever's at ${BASH_SOURCE[0]} -- when
+  # invoked as plain `curodav-ctl update`, that's already the installed
+  # copy itself, a same-file no-op). Previously only `install` refreshed
+  # /usr/local/bin, so a fix to this script (e.g. the health_check timing
+  # fix, 2026-09-13) never took effect via `update` on an already-installed
+  # host -- every future `update` kept re-running the stale pre-fix binary
+  # forever, even though every new release's checkout had the fix. Done
+  # before the health check below so THIS run also benefits if this
+  # function is ever re-entered, though the primary effect is on the next
+  # invocation of `curodav-ctl`.
+  if [ -f "${tmp_clone}/scripts/curodav-ctl" ]; then
+    install -m 0755 "${tmp_clone}/scripts/curodav-ctl" "$INSTALLED_CTL"
+  fi
+
   local hash release_name release_dir
   hash="$(git -C "$tmp_clone" rev-parse --short HEAD)"
   release_name="release_$(date +%Y%m%d_%H%M%S)_${hash}"
