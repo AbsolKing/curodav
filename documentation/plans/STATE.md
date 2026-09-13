@@ -17,6 +17,71 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request: automate the DAVx5/Radicale
+  deploy story that `deploy/README.md` previously documented as a one-time
+  manual walkthrough. `scripts/curodav-ctl` gained `install --dav`
+  (standalone, idempotent, retrofits DAV access onto an already-installed
+  app or is run fresh any time): interactively collects
+  `DOMAIN_APP`/`TUNNEL_NAME`/`RADICALE_USER` and a Radicale password
+  (persisted to `/srv/curodav/shared/deploy.env`, outside any disposable
+  release checkout), runs `firewall.sh` -> `radicale/install-radicale.sh`
+  -> `nginx/install-nginx.sh` -> `cloudflared/install-cloudflared.sh` in
+  order, then wires `CC_RADICALE_URL`/`USER`/`PASSWORD`/`PUBLIC_URL`
+  straight into `/srv/curodav/shared/.env` and restarts `curodav` --
+  no manual file editing left. Plain `install` (no flag) now also
+  optionally asks for an admin login up front and offers to chain into
+  `--dav`. `update` gained a warn-only `radicale_reachability_check()`
+  (loopback + nginx-local + public-hostname tiers) that never blocks/rolls
+  back an app deploy.
+
+  **Important architecture correction mid-session:** the deploy/ scripts
+  this builds on top of had Radicale on a SECOND subdomain (`DOMAIN_DAV`,
+  its own Cloudflare Tunnel ingress rule) -- direct pushback from the user
+  ("RADICALE DOESN'T SIT AT https://dav.yourdomain.com IT SHOULD NOT USE
+  ANOTHER TUNNEL") corrected this mid-build. Reworked to ONE hostname
+  (`DOMAIN_APP`) with Radicale at a `/radicale/` PATH under it, split
+  locally by a new `deploy/nginx/` path-router (nginx forwards the FULL
+  unstripped path plus an `X-Script-Name: /radicale` header -- verified
+  against the installed Radicale's own source, `app/__init__.py` lines
+  ~479-515, that it auto-detects "behind a reverse proxy" from
+  `X-Forwarded-*` headers and reads `X-Script-Name`/`HTTP_X_SCRIPT_NAME`
+  for its base prefix; letting nginx's `proxy_pass` silently strip the
+  prefix instead would have produced correctly-routed requests but
+  incorrectly-prefixed hrefs in Radicale's own WebDAV responses, breaking
+  DAVx5's follow-up requests in a way that'd be hard to diagnose from the
+  symptom). `deploy/cloudflared/config.yml.template` now has exactly one
+  ingress rule, pointed at nginx's `127.0.0.1:8080` instead of the app
+  directly.
+
+  Also fixed while in this area (user confirmed, "yes fix it now"):
+  Published Lists' `/published-lists` page always showed Radicale's
+  loopback address (`http://127.0.0.1:5232/...`) as its "subscribe_url",
+  copy-pasteable but non-functional off-box, regardless of any public DAV
+  setup. New `config.py` field `radicale_public_base_url`
+  (`CC_RADICALE_PUBLIC_URL`, optional, wired automatically by `install
+  --dav`) lets `routers/published_lists.py::list_index` show the real
+  `https://DOMAIN_APP/radicale/<user>/` link instead, falling back to the
+  loopback address exactly as before when unset.
+
+  **Tests**: new `test_list_index_prefers_public_url_when_set`
+  (test_phase6_published_lists.py) asserts the override takes effect.
+  Three pre-existing hand-rolled fake-`Settings` test fixtures
+  (test_phase6_published_lists.py, test_published_lists_visibility.py,
+  test_phase8_settings_hub.py's `_request_with_radicale`) needed
+  `radicale_public_base_url` added or they'd `AttributeError` -- caught by
+  actually running the suite, not just adding the field and assuming.
+  256 tests run across every area touching `Settings`/published lists/env
+  file/auth/CalDAV bridge -- all passing. Full-suite run not completed
+  this session (sandbox can't hold a long-running background process);
+  next session (or before deploying) should run the complete
+  `pytest -q` once as a final check, though nothing here touches
+  code paths outside what was already targeted.
+
+  **Not live-verified** -- no real LXC/Cloudflare account available from
+  this session to actually run `curodav-ctl install --dav` end to end;
+  `bash -n` syntax-checked all shell scripts and manually traced the nginx
+  request flow against Radicale's actual source instead.
+
 - **Shipped:** 2026-09-13 -- same-day follow-up direct report: "in
   page-banner-wrap, the edit mode buttons are not clickable in all the
   button glory. the bottom part is not clickable." Root cause:
