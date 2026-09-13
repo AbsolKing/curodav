@@ -17,6 +17,59 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request: "in the labels table bulk
+  select i would like an option to merge labels into one." Asked a
+  clarifying question on how the destination should be chosen (Ask
+  UserQuestion: pick one of the selected rows / pick any existing label /
+  type any name); Peter chose "pick any existing label" -- same freedom
+  the pre-existing single-row Merge modal already gives (label_merge_modal.
+  html/routers/labels.py::merge_modal), just extended to a multi-select.
+
+  New `_bulk_actions_bar.html` `merge_label` param (optional, default
+  `None` -- every existing caller except Labels leaves it unset and is
+  unaffected) renders a third button between Clear and Delete. Labels'
+  own `CCBulkSelect.init` call gained `mergeButtonId`/`mergeModalUrl`;
+  `static/bulk_select.js` opens a modal (`window.CCModal.open`) instead of
+  a confirm-sheet+fetch for this action, since picking a destination needs
+  a real picker, not a yes/no -- requires >=2 rows selected first (a toast
+  otherwise). New `GET /settings/labels/bulk-merge-modal?uids=a,b,c` ->
+  `label_bulk_merge_modal.html` (lists the selected names + every label as
+  destination candidates) and `POST /settings/labels/bulk-merge` (form:
+  repeated `uids` + `dest_name`) -> `labels_router.bulk_merge_labels`, a
+  plain loop over the existing single-pair `db.merge_labels` (skips
+  `dest_name` if it's also among `uids`, same as merging a label into
+  itself already being a no-op). Reuses the async-CRUD `data-cc-change=
+  "label"` wiring the single-row Merge/Edit modals already have, so a
+  successful bulk merge refreshes just the table region instead of a full
+  reload.
+
+  Side note (not touched by this slice, just discovered while wiring this
+  up): the single-row Merge modal/route (`label_merge_modal.html`,
+  `routers/labels.py::merge_modal`/`merge_label`) has no live trigger
+  anywhere in the current UI -- `_row_action_buttons.html`'s per-row
+  actions are Edit/Delete only now, and the modal's own hardcoded form
+  action (`/labels/{name}/merge`) predates the router's `/settings/labels`
+  prefix and would 404 if it were ever opened. Left as-is; flagging in
+  case a future slice wants to either wire a trigger back in (with the
+  URL fixed) or remove the dead code.
+
+  **Tests**: new `TestLabelsBulkMerge` class in `test_bulk_actions_tables.
+  py` (5 tests) -- merges N selected labels into a destination and
+  confirms membership unions correctly and the merged-away names are gone
+  from `list_all_label_names`; confirms a destination that's also among
+  `uids` is skipped rather than merged into itself; confirms an empty/
+  whitespace-only or reserved `dest_name` raises (400); confirms the modal
+  GET endpoint's context carries both the selected names and the full
+  sorted label list. Ran the file alone first (22 passed), then full
+  suite in 12 chunks of ~8 files each (this session's per-bash-call ~45s
+  ceiling) -- 2,236 passed (2,231 + the 5 new tests), 0 failed
+  (`test_caldav_bridge_live.py` excluded as always).
+
+  **Not visually verified**: sandbox can't reach a real browser -- Peter
+  should confirm the Merge button shows up in Labels' bulk-actions bar
+  once 2+ rows are checked, that the modal opens with the right label
+  chips, and that a real merge redirects/refreshes the table correctly.
+
 - **Shipped:** 2026-09-13 -- direct request (9 of 9, closing out the
   "before v2.2.0 release" batch): "the label table inside settings should
   be sorted by Groups first, then by type (space first, then projects,

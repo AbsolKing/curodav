@@ -548,6 +548,46 @@ async def bulk_delete_labels(request: Request, conn=Depends(get_db)):
     return JSONResponse({"ok": True, "count": len(names)})
 
 
+@router.get("/bulk-merge-modal")
+def bulk_merge_modal(uids: str, request: Request, conn=Depends(get_db)):
+    """Direct request: "in the labels table bulk select i would like an
+    option to merge labels into one". Opened via `static/bulk_select.js`'s
+    Merge button (see labels_manage.html's CCBulkSelect.init call) using
+    `window.CCModal.open`, same mechanism the per-row Edit button already
+    uses -- `uids` arrives as a comma-joined query string (a GET link, not
+    a JSON body) since this is a plain data-modal navigation, not a fetch
+    call. Destination list is every existing label (2026-09-13 direct
+    answer to a clarifying question: "pick any existing label" -- not
+    restricted to the selected rows themselves, so a merge target outside
+    the current selection is allowed, same freedom the single-row Merge
+    modal already gives)."""
+    selected = [n for n in uids.split(",") if n]
+    all_names = sorted((l["name"] for l in db.list_labels(conn)), key=str.lower)
+    return templates.TemplateResponse(
+        "label_bulk_merge_modal.html",
+        {"request": request, "selected_names": selected, "all_label_names": all_names},
+    )
+
+
+@router.post("/bulk-merge")
+def bulk_merge_labels(uids: list[str] = Form([]), dest_name: str = Form(...), conn=Depends(get_db)):
+    """Merges every selected label in `uids` into `dest_name` -- a plain
+    loop over the existing single-pair `db.merge_labels` (see merge_label
+    above), same underlying semantics: each source label's usage moves
+    onto `dest_name` and its own `label_config` row is dropped. `dest_name`
+    itself is skipped if it's also among `uids` (merging a label into
+    itself is a no-op `db.merge_labels` already guards against, but
+    skipping here avoids the pointless call)."""
+    dest_name = (dest_name or "").strip()
+    if not dest_name:
+        raise HTTPException(400, "Choose a label to merge into")
+    _reject_reserved_label_name(dest_name)
+    for name in uids:
+        if name and name != dest_name:
+            db.merge_labels(conn, name, dest_name)
+    return RedirectResponse(url="/settings/labels", status_code=303)
+
+
 @router.post("/{name}/set")
 def set_label(
     name: str,

@@ -38,6 +38,19 @@
 //                       usage," not an irreversible row delete, so it
 //                       supplies its own wording -- see
 //                       labels_manage.html.)
+//   mergeButtonId    -- (2026-09-13, Labels only) id of the bar's optional
+//                       Merge button (`_bulk_actions_bar.html`'s
+//                       `merge_label` param). Omit entirely for every
+//                       table that has no merge concept.
+//   mergeModalUrl    -- base URL for the merge picker modal (a GET,
+//                       opened via `window.CCModal.open` -- merging needs
+//                       a real destination picker, not a yes/no confirm-
+//                       sheet). The selected uids are appended as
+//                       `?uids=a,b,c`; the modal itself renders the
+//                       destination picker and posts elsewhere. Requires
+//                       at least 2 rows selected (merging one label into
+//                       itself is meaningless) -- fewer just shows a
+//                       toast instead of opening the modal.
 //   rowSelector      -- (2026-09-14, contacts_list.html) CSS selector for
 //                       "the whole selectable row" a checkbox belongs to,
 //                       toggled `.is-selected` for styling -- default "tr"
@@ -236,6 +249,19 @@
         checkboxes().forEach((cb) => setSelected(cb, false));
         lastClickedIdx = null;
         updateBar();
+      });
+    }
+
+    if (cfg.mergeButtonId && cfg.mergeModalUrl) {
+      document.getElementById(cfg.mergeButtonId)?.addEventListener("click", () => {
+        const label = cfg.itemLabel || "item";
+        if (selected.size < 2) {
+          window.ccToast({ message: `Select at least 2 ${label}s to merge.`, variant: "error" });
+          return;
+        }
+        const uids = Array.from(selected);
+        const url = cfg.mergeModalUrl + "?uids=" + encodeURIComponent(uids.join(","));
+        if (window.CCModal) window.CCModal.open(url);
       });
     }
 
