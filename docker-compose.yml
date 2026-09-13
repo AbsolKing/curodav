@@ -7,7 +7,7 @@ services:
     volumes:
       - radicale-data:/data
       - ./docker/radicale/config:/config/config:ro
-      - radicale-htpasswd:/config/htpasswd
+      - ./docker/radicale/htpasswd:/config/htpasswd:ro
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      - "0.0.0.0:8000:8000"
     environment:
       CC_RADICALE_URL: "http://radicale:5232/curodav/"
       CC_RADICALE_USER: curodav
@@ -31,5 +31,4 @@ services:
 
 volumes:
   radicale-data:
-  radicale-htpasswd:
   curodav-data:
