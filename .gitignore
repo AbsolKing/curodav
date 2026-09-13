@@ -34,6 +34,9 @@ shared/.env
 # Agent tooling state -- not part of the app, not public-facing.
 .opencode
 
+# Docker -- Radicale htpasswd (contains credentials)
+docker/radicale/htpasswd
+
 # Editor / OS state that sometimes leaks in despite the patterns above.
 .idea/
 .vscode/
