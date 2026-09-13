@@ -17,6 +17,42 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- same-day follow-up direct report: "in
+  page-banner-wrap, the edit mode buttons are not clickable in all the
+  button glory. the bottom part is not clickable." Root cause:
+  `.page-banner-header-row` (the avatar+title row below the cover,
+  2026-09-07's Notion-style rework) is deliberately pulled up 36px via
+  `margin-top:-36px` so the avatar straddles the cover's bottom edge --
+  but that also makes its own (full-width, otherwise-invisible-outside-
+  avatar/title) box physically overlap the bottom 36px of `.page-banner`.
+  Both that row and `.page-banner-actions` (New widget/Add banner/Reset
+  layout/Done, floated bottom-right *inside* the cover) carried
+  `z-index:1` in the same stacking context -- same value, so DOM order
+  decided, and the header row (later in the DOM) painted on top,
+  silently eating clicks over however much of the buttons' own height
+  fell inside that 36px band, even though nothing was visibly drawn
+  there. Fixed with `pointer-events:none` on `.page-banner-header-row`
+  itself (style.css) -- nothing inside it is interactive (a plain
+  `<img>`/icon `<span>` avatar, a plain `<h1>` title, confirmed by
+  reading `_page_banner.html` and `deps.py`'s `avatar()`), so the whole
+  box can safely become click-through, letting events fall to whatever
+  is actually underneath instead of fighting a z-index battle with a
+  sibling it was never meant to compete with.
+
+  **Live-verified** (Claude in Chrome, `/` with Edit mode on): clicking
+  the very bottom edge of "Add banner" -- the exact strip that used to
+  be dead -- now opens the Page banner modal. Also exercised the
+  previous entry's new command-palette row end-to-end in the same
+  session (Ctrl-K, typed "edit", "Turn on/off Edit mode" row present and
+  working both directions).
+
+  **Tests**: none added -- pure CSS, no existing precedent in this
+  suite for asserting raw property values out of style.css (every prior
+  banner CSS fix this same day noted the same "pure CSS, none needed").
+  test_banners.py/test_page_header_narrow.py/test_dashboard_router.py
+  re-run to confirm the HTML-structure assertions those already cover
+  are unaffected -- 235 passed, 0 failed.
+
 - **Shipped:** 2026-09-13 -- direct request: "a way to activate edit
   mode with the help of the command palette search thing." Edit mode
   (Settings > Appearance's persistent toggle, EDIT_MODE_KEY) previously

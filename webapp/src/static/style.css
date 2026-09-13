@@ -6443,6 +6443,26 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
   margin-top:-36px; margin-bottom:var(--space-4);
   padding-left:var(--space-4); padding-right:var(--space-4);
   position:relative; z-index:1;
+  /* 2026-09-13 bug fix, direct report ("the edit mode buttons are not
+     clickable in all their button glory, the bottom part is not
+     clickable") -- this row's negative margin-top pulls it up 36px to
+     let the avatar straddle the cover's bottom edge (by design, see the
+     comment above), but that also means its own box -- a plain <div>,
+     full width, no visible background outside the avatar/title -- now
+     physically overlaps the bottom 36px of .page-banner. Both this row
+     and .page-banner-actions (the New widget/Add banner/Reset layout/
+     Done buttons, floated bottom-right *inside* .page-banner) carry
+     z-index:1 in the same stacking context, so this row -- later in the
+     DOM -- painted on top and silently ate clicks over however much of
+     the buttons' own height fell inside that 36px overlap, even though
+     nothing here is visibly drawn there. Nothing in this row is
+     interactive (avatar is a plain <img>/icon span, title is a plain
+     h1 -- see _page_banner.html), so it's safe to make the whole box
+     click-through and let events fall to whatever's actually
+     underneath (the cover photo, or the action buttons) instead of
+     fighting over z-index with a sibling it isn't supposed to compete
+     with in the first place. */
+  pointer-events:none;
 }
 .page-banner-avatar-wrap{flex:none;}
 .avatar-hero{
