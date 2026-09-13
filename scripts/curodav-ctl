@@ -431,6 +431,10 @@ run_dav_setup() {
 
 cmd_install() {
   require_root
+  # Refresh /usr/local/bin's copy of this script even on the --dav-only
+  # path, so PATH-based invocations pick up fixes without needing to be
+  # run from a release checkout again.
+  self_install
 
   if [ "${DAV_ONLY:-0}" -eq 1 ]; then
     run_dav_setup
@@ -454,7 +458,6 @@ cmd_install() {
   ensure_uv
   write_env_template
   write_unit
-  self_install
   cmd_update
   systemctl enable --now "${APP_NAME}.service"
   log "Installed and started ${APP_NAME}.service."
