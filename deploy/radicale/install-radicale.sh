@@ -41,8 +41,13 @@ echo "==> Creating ${BASE_DIR} layout..."
 mkdir -p "${BASE_DIR}/collections"
 
 echo "==> Creating venv + installing radicale + bcrypt..."
-if [ ! -d "${BASE_DIR}/venv" ]; then
+if [ ! -d "${BASE_DIR}/venv" ] || [ ! -x "${BASE_DIR}/venv/bin/pip" ]; then
+  rm -rf "${BASE_DIR}/venv"
   python3 -m venv "${BASE_DIR}/venv"
+  if [ ! -x "${BASE_DIR}/venv/bin/pip" ]; then
+    echo "==> venv created but has no pip -- install the venv/ensurepip package for your python3 (e.g. 'apt-get install -y python3-venv') and re-run." >&2
+    exit 1
+  fi
 fi
 "${BASE_DIR}/venv/bin/pip" install --upgrade pip --quiet
 "${BASE_DIR}/venv/bin/pip" install --upgrade "radicale>=3.3" bcrypt --quiet
