@@ -17,6 +17,73 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (7 of 9 in the same "before
+  v2.2.0 release" batch): "contact images should be resource efficient
+  (webp) -- I know they can be saved inline in the contacts thing [as
+  whatever format the syncing CardDAV client chose], I'd prefer the
+  frontend to serve webp images, not the one in vcf directly. Of course
+  they should be the same [visually]." A contact's stored photo format is
+  whatever a web upload's own allowlist picked (JPEG/PNG/GIF/WEBP,
+  `routers/contacts.py::_read_photo`) OR, for a CardDAV-synced contact,
+  whatever format the *external syncing client* chose for its vCard
+  PHOTO property (`vcard_rows.py`, completely unconstrained -- the actual
+  gap this request named).
+
+  This is the first real image-**decoding** dependency the app has ever
+  taken on -- `image_sniff.py` and multiple older comments in
+  `routers/contacts.py`/`banners.py` explicitly documented a "no Pillow"
+  stance, but that only ever held because nothing needed to decode pixels
+  before now (sniffing a signature and serving stored bytes verbatim
+  never did); re-encoding into a *different* format has no
+  byte-rearranging shortcut, it needs a real decoder. Added `pillow>=10`
+  to `webapp/pyproject.toml` and regenerated `uv.lock` (this sandbox had
+  no `uv` binary available by default -- installed both `pillow` and `uv`
+  itself into the project's own `.venv` via `pip`, then ran `uv lock`
+  from there; `uv lock` resolved cleanly, "Added pillow v12.3.0").
+
+  New `src/image_convert.py`, one function: `to_webp(data) -> bytes |
+  None` -- decodes with Pillow, `convert("RGBA")` (preserves a GIF/PNG's
+  transparency instead of flattening it, and normalizes odd source modes
+  like a JPEG's CMYK), re-encodes as WebP at quality 82 (a reasonable
+  avatar/thumbnail default, not a value derived from a specific
+  size/quality target in the request), returns `None` on any decode
+  failure (corrupt/truncated sync data) rather than raising.
+  `routers/contacts.py::contact_photo_image` now always attempts this on
+  the way out and switches `media_type` to `image/webp` when it succeeds
+  -- falling back to the exact old behavior (serve the original stored
+  bytes/type) when it can't decode them, so a contact with a genuinely
+  corrupt synced photo still serves *something* instead of 404ing.
+  Deliberately scoped to contacts only, per the request -- banners and the
+  user's own profile photo (`banners.py`/`settings.py`'s own photo
+  routes) are untouched. This transcodes at serve-time only; `photo_b64`/
+  `photo_type` on disk are unchanged, so a vCard export of the same
+  contact still round-trips the original bytes, not the WebP re-encode.
+
+  **Tests**: the two pre-existing route tests
+  (`test_serves_photo_bytes_with_immutable_cache_control`,
+  `test_webp_photo_type_served_correctly`) use fake, non-decodable bytes
+  and needed no changes -- `to_webp` correctly fails closed on them and
+  the route falls back to its old behavior, which is exactly what they
+  already asserted. Added two new tests using real Pillow-generated
+  JPEG/PNG fixtures to actually exercise the transcode path: confirms the
+  served bytes are real WebP (via `image_sniff.sniff_image_type`, not
+  just a claimed media_type), decode back to the right size/near-original
+  color (closeness, not exact equality -- lossy WebP at quality 82 shifts
+  channel values by a few units even on a flat swatch), and that a PNG's
+  alpha channel survives the round-trip rather than getting flattened.
+  Ran `test_image_caching.py` alone first (27 passed), then full suite in
+  the same 12-chunk split as the entries above -- 2,222 passed (2,220 +
+  the two new tests), 0 failed (`test_caldav_bridge_live.py` excluded as
+  always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should confirm a real
+  synced (non-web-uploaded) contact photo still looks right once served
+  through this path, and that `uv sync`/a real deploy picks up the new
+  `pillow` dependency correctly from the regenerated lock file (this was
+  only verified via `uv lock`'s own resolution succeeding in-sandbox, not
+  a real deploy-image build).
+
 - **Shipped:** 2026-09-13 -- direct request (6 of 9 in the same "before
   v2.2.0 release" batch): "row-select should not persist between page
   refresh!" Audited every place selection state could plausibly survive a
