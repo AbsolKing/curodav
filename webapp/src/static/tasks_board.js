@@ -43,6 +43,20 @@
 // `endDrag` looks up that column's own `.kanban-cards` child as the actual
 // append target -- `.kanban-column` itself also wraps the header, so
 // appending straight into it would put the card outside the card list.
+//
+// 2026-09-13 (direct request, "anywhere I click kanban-card to be able to
+// drag and drop it, also a double click anywhere on kanban-card should open
+// it, keep the click title to open modal window"): drag-from-anywhere was
+// already true (see the 09-10 note above -- pointerdown is bound to the
+// whole card, not a handle). What was missing was open-from-anywhere on
+// DOUBLE click while leaving the single click on `.kanban-card-title` alone.
+// Rather than duplicating modal.js's open logic, dblclick here just
+// re-dispatches a plain "click" at the card's own title link -- that bubbles
+// to document and modal.js's existing `[data-modal]` delegated listener
+// picks it up exactly as if the title had been clicked directly. Skipped
+// when the dblclick itself landed on `[data-modal]` (the title) since the
+// browser already delivered two real clicks there, each already opening the
+// modal on its own; re-dispatching a third would just reopen it.
 
 (function () {
   const board = document.getElementById("kanban-board");
@@ -130,6 +144,13 @@
   board.querySelectorAll(".kanban-card").forEach((card) => {
     card.style.touchAction = "pan-y"; // let vertical scroll through until a drag actually starts
 
+    // Backstop for the banner `<img>`/title `<a>` (draggable="false" in
+    // project_detail.html already covers this) -- if either one is ever
+    // reached without that attribute (a stray copy-paste of the card
+    // markup, say), this stops the browser's native HTML5 drag from
+    // hijacking the press before pointerdown's own drag logic ever sees it.
+    card.addEventListener("dragstart", (e) => e.preventDefault());
+
     card.addEventListener("pointerdown", (e) => {
       if (e.button !== undefined && e.button !== 0) return; // left-click / primary touch only
       dragCard = card;
@@ -180,6 +201,14 @@
       if (dragCard !== card) return;
       endDrag(card, false);
       card.style.touchAction = "pan-y";
+    });
+
+    card.addEventListener("dblclick", (e) => {
+      if (e.target.closest("[data-modal]")) return; // title's own two real clicks already opened it
+      const link = card.querySelector(".kanban-card-title");
+      if (!link) return;
+      e.preventDefault();
+      link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
   });
 })();

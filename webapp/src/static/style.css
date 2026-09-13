@@ -5884,6 +5884,18 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
 .widget-row-icon{width:26px;}
 .widget-row-time{white-space:nowrap; width:1%;}
 .widget-row-right{text-align:right;}
+/* 2026-09-13 (direct request, "the checkbox has a left margin the other
+   [rows] don't have"): a task row's leading cell is a real `.icon-btn`
+   (28px, 40px on coarse pointer -- the shared touch-target size every
+   icon-btn in the app uses), which centers its 16px icon inside that whole
+   box. An event/deadline row's leading marker (`.widget-event-dot`, the
+   flag `.icon-sm`) has no such wrapper box, so it sits flush against the
+   cell's own left padding -- the checkbox's icon, centered in a box wider
+   than itself, effectively sat ~6px further right of that same edge.
+   `justify-content:flex-start` only changes where the icon sits INSIDE the
+   button (flush left, matching the other rows) without shrinking the
+   button itself, so the tap target stays full-size at every breakpoint. */
+.widget-row-icon .icon-btn{justify-content:flex-start;}
 /* Event row leading marker (2026-09-13, direct request: "circle dot like
    in mockup") -- sits in the same `.widget-row-icon` 26px slot a task's
    checkbox occupies, so an Agenda widget's Overdue/Tasks/Events rows all
