@@ -17,6 +17,31 @@ session start.
 
 ## Right now
 
+- **Verified, no change needed:** 2026-09-13 -- direct request (4 of 9 in
+  the same "before v2.2.0 release" batch): "contacts should be able to be
+  created and edited even without a birthday attached to it." Already
+  true today, checked every layer that could plausibly block it:
+  `contact_form.html`'s birthday `<input>` (line ~267) has no `required`
+  attribute -- the only required field on that form is `full_name`; its
+  `pattern` attribute only rejects malformed *non-empty* input, an empty
+  value passes HTML5 validation. `routers/contacts.py::_parse_birthday_field`
+  (both `create_contact` and `update_contact` call it) treats a blank
+  string as "no birthday," returning `None`, not raising -- explicitly
+  documented in its own docstring as deliberate. The `contacts.birthday`
+  DB column (`db.py`, added via `_ensure_column`) is a plain nullable
+  `TEXT`, no `NOT NULL`/default. No JS file references "birthday" at all
+  (grepped `static/*.js`), so no client-side blocker either. Already
+  covered by two existing green tests in
+  `tests/test_contacts_field_parity_birthday.py`:
+  `test_create_contact_blank_birthday_stores_none` and
+  `test_update_contact_can_clear_birthday`. Ran that file alone to confirm
+  (46 passed) -- no code changed, so no full-suite run or commit beyond
+  this doc note; if Peter is hitting an actual blocker in the deployed
+  app, it isn't in this code path and is worth a fresh bug report with
+  the exact error/behavior seen (stale deploy vs. this branch, or a
+  different field being mistaken for birthday, are the likeliest
+  explanations).
+
 - **Shipped:** 2026-09-13 -- direct request (3 of 9 in the same "before
   v2.2.0 release" batch): "widgets that don't have a time limit -- the
   time limit shouldn't actually be infinite, it should always be 364 days
