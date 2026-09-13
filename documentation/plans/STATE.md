@@ -17,6 +17,69 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- same-day follow-up direct request: "could you
+  continue with fixing the lack of brute force protection?" (Radicale's
+  own auth has none -- flagged but deliberately left out of the config-
+  visibility slice directly below this one.) Two approaches considered
+  and rejected before landing on the one that's actually wired in:
+  - **fail2ban watching Radicale's log, banning via iptables/ufw** --
+    doesn't work at all in this architecture: `firewall.sh` closes every
+    inbound port except SSH, and the only thing that ever connects to
+    nginx/Radicale is `cloudflared`, over loopback. There's no inbound
+    connection from a real attacker's IP for a local firewall rule to
+    ever block.
+  - **A Cloudflare WAF rate-limiting rule** on `/radicale/*` would
+    genuinely work (stops requests at Cloudflare's edge, before the
+    tunnel) but isn't automated: it needs a scoped Cloudflare API token
+    this tooling never collects (`cloudflared tunnel login`'s cert.pem
+    only authorizes tunnel/DNS operations, not zone-level WAF rules).
+    Documented as a manual option in `deploy/README.md`'s new "Rate
+    limiting Radicale's auth" section, not built.
+
+  What's actually shipped: **nginx's own `limit_req`**, applied only to
+  the `/radicale/` location. New `deploy/nginx/curodav-ratelimit.conf`
+  (installed to `/etc/nginx/conf.d/` by `install-nginx.sh` -- has to live
+  outside `sites-available/`, since `limit_req_zone` is only legal in
+  nginx's `http {}` context, and Debian's stock `nginx.conf` includes
+  `conf.d/*.conf` before `sites-enabled/*`, confirmed via web search
+  rather than assumed) defines a 10r/m-per-IP zone with a `map`-based
+  fallback bucket for requests with no client-IP header at all.
+  `curodav.nginx.conf.template`'s `/radicale/` block references it with
+  `burst=40 nodelay` -- enough to absorb one full DAVx5/Thunderbird/iOS
+  sync cycle's PROPFIND/REPORT/GET burst without any delay, while
+  capping a sustained guessing loop to ~14,400 attempts/day instead of
+  unlimited.
+
+  Keyed on Cloudflare's `CF-Connecting-IP` header, deliberately NOT
+  nginx's own `$remote_addr`/`$binary_remote_addr`: since cloudflared is
+  the only thing that ever connects to nginx (loopback), `$remote_addr`
+  is *always* 127.0.0.1 regardless of who's actually hitting the public
+  hostname -- rate-limiting on it would either bucket every real client
+  together or (set high enough to avoid that) not throttle an attacker
+  at all. `CF-Connecting-IP` is set by Cloudflare's edge from the real
+  TCP connection and can't be spoofed by a client-supplied header of the
+  same name.
+
+  `deploy/README.md` gained the full "Rate limiting Radicale's auth"
+  section (the two rejected approaches + why, what's actually wired in,
+  how to recognize a 429 and what to do about it) plus an updated
+  architecture diagram and files table.
+
+  **Tests**: none -- pure deploy/infra config, no Python touched this
+  slice; the app's own test suite (`pytest -q`) has nothing to exercise
+  here. Verification was: `bash -n` on the touched shell script (clean),
+  a directive-by-directive manual read of both nginx files against
+  nginx's own context rules (`map`/`limit_req_zone`/`limit_req_status`
+  all http-context-only, `limit_req` valid in the location block it's
+  used in), and a web search confirming the conf.d-before-sites-enabled
+  include order Debian's default `nginx.conf` uses (couldn't install
+  nginx in this sandbox to run `nginx -t` directly -- no apt access).
+
+  **Not live-verified**: no real host to actually run `install-nginx.sh`
+  against, hit the `/radicale/` endpoint past the burst limit, and
+  confirm a real 429 -- next session (or before relying on this in
+  production) should do that once a real deploy exists.
+
 - **Shipped:** 2026-09-13 -- same-day follow-up direct request: "the way
   these env variables are set, I think they are a bit opaque and hard to
   set or verify. I also don't know if they are set correctly if set in

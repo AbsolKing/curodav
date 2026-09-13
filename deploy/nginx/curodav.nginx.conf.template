@@ -17,6 +17,15 @@ server {
     }
 
     location /radicale/ {
+        # 2026-09-13 direct request (Radicale has no brute-force/lockout
+        # protection of its own) -- caps request rate per real client IP,
+        # using the zone defined in curodav-ratelimit.conf (installed
+        # separately to /etc/nginx/conf.d/, see that file's own comment for
+        # why $http_cf_connecting_ip and not nginx's own $remote_addr).
+        # burst=40 absorbs one full DAVx5/Thunderbird/iOS sync cycle's
+        # handful of PROPFIND/REPORT/GET requests with no delay; only a
+        # SUSTAINED rate above 10r/m starts queuing/rejecting (429) requests.
+        limit_req zone=curodav_radicale burst=40 nodelay;
         proxy_pass http://127.0.0.1:5232;
         proxy_set_header Host $host;
         # Do NOT let proxy_pass strip the /radicale/ prefix -- Radicale needs

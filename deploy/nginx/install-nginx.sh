@@ -24,6 +24,14 @@ echo "==> Installing curodav's path-router site..."
 cp "${SCRIPT_DIR}/curodav.nginx.conf.template" "$SITE_FILE"
 ln -sf "$SITE_FILE" /etc/nginx/sites-enabled/curodav
 
+# 2026-09-13 -- Radicale-specific rate limiting (see that file's own
+# comment for why). Must land in conf.d/, not sites-available/: the
+# limit_req_zone directive it defines is only legal in nginx's http {}
+# context, and Debian's stock nginx.conf already includes conf.d/*.conf
+# from there (same mechanism it uses for sites-enabled/*).
+echo "==> Installing Radicale rate-limit zone..."
+cp "${SCRIPT_DIR}/curodav-ratelimit.conf" /etc/nginx/conf.d/curodav-ratelimit.conf
+
 if [ -e /etc/nginx/sites-enabled/default ]; then
   echo "==> Removing the stock default site..."
   rm -f /etc/nginx/sites-enabled/default
