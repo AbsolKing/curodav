@@ -17,6 +17,36 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- third pass on the same tile, direct report
+  the gradient problem persisted after both prior fixes ("check the
+  chrome in browser" -- couldn't: Claude in Chrome's extension wasn't
+  reachable this session, so this fix is NOT live-verified, unlike this
+  project's usual standard -- flagged to the user, worth confirming
+  visually next session). Prior two fixes (percentage math, then the
+  --tile-swatch legacy-color fallback) were both real bugs but didn't
+  address a third, more fundamental one: the whole rule lived in one
+  `background` shorthand built around `color-mix()`. A single shorthand
+  is all-or-nothing -- if `color-mix()` itself isn't supported by
+  whatever's rendering this (a newer CSS Color 4 function), the entire
+  declaration goes invalid regardless of how correct the inputs are.
+  Rebuilt with no `color-mix()` at all: `background-color` (solid fill,
+  fallback chain ending in a literal hex, not just another `var()`) and
+  `background-image` (a plain `rgba()` white sheen for the gradient look)
+  as two independent longhand properties instead of one shorthand, so a
+  failure in one can't take the other down with it.
+
+  **Tests**: none needed -- inline `--tile-swatch` markup is unchanged,
+  only how the CSS rule consumes it; existing `TestLabelIconTile`
+  assertions (which check the inline style attribute, not computed
+  background) still pass unmodified. Full suite re-verified in 4 batches
+  under `TZ=UTC` -- **2205 passed, 0 failed**, unchanged from the entry
+  below.
+
+  **Next slice**: get this actually confirmed in a real browser (Claude
+  in Chrome or the user's own check) before treating the tile as settled
+  -- three rounds of "fixed" without a single live look is worth breaking
+  the pattern on.
+
 - **Shipped:** 2026-09-13 -- follow-up direct report on the previous
   entry's opacity fix ("the --tile-swatch doesn't have full opacity") --
   the 78%/22% color-mix() fix was real but not the whole story. Root

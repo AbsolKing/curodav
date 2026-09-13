@@ -6448,13 +6448,30 @@ button.btn.btn-sm, a.btn.btn-sm{padding:4px 10px; font-size:13px;}
    only the shape and fill are its own. */
 .label-icon-tile{
   border-radius:28%;
-  /* 2026-09-13 direct fix: the two color-mix() percentages here used to
-     read 100%/22% (summing to 122%, not 100%) -- per the CSS Color 4
-     spec, percentages that don't sum to 100% get normalized in a way
-     that can knock alpha down off fully opaque. Written as 78%/22%
-     (an exact 100% split) so the lighter gradient stop is guaranteed
-     fully opaque, not just "probably fine in this browser." */
-  background:linear-gradient(135deg, color-mix(in srgb, var(--tile-swatch) 78%, white 22%), var(--tile-swatch));
+  /* 2026-09-13, third pass -- direct report the gradient still wasn't
+     fully opaque even after two targeted fixes (the color-mix() percentage
+     math, then the --tile-swatch fallback for legacy colors). Both of
+     those were real bugs, but this rule had a THIRD, more fundamental
+     problem neither one touched: everything lived in one `background`
+     shorthand built around color-mix() (`background:linear-gradient(135deg,
+     color-mix(...), var(--tile-swatch))`). A single shorthand value is
+     all-or-nothing -- if color-mix() itself isn't supported by the
+     browser rendering this (it's a newer CSS Color 4 function; support
+     landed later than most of the properties this app otherwise relies
+     on), the ENTIRE declaration is invalid, not just the one function
+     call, and the whole tile falls back to transparent regardless of how
+     correct the percentages or the swatch fallback are.
+
+     Rebuilt with no color-mix() at all, split across two independent
+     longhand properties instead of one shorthand: `background-color` is
+     the solid, always-supported fill (with its own literal hex at the end
+     of the fallback chain, not just another var() that could itself be
+     undefined), and `background-image` is a plain rgba() white sheen for
+     the "gradient" look, layered on top -- rgba() has no browser-support
+     question at all. If either property somehow fails, it fails on its
+     own; it can no longer take the other one down with it. */
+  background-color:var(--tile-swatch, var(--cal-bg-blue, #3778bd));
+  background-image:linear-gradient(135deg, rgba(255,255,255,.3), rgba(255,255,255,0) 60%);
   color:#fff;
 }
 .page-banner-title{
