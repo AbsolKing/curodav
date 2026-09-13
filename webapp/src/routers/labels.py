@@ -197,6 +197,24 @@ ICON_GROUPS: dict[str, list[str]] = {
         "clock", "bell", "tool", "settings", "activity", "calendar",
         "home", "repeat",
     ],
+    # Added 2026-09-13 (direct request: "a bigger library of icons that fit
+    # the actual uses of the app") -- curated against the user's real label
+    # list (University, Asociația de Dezbateri, Birthday, Creangă Debate,
+    # Debate, Family, High School), which had nothing more specific than
+    # generic book/award/users glyphs to work with. New symbols drawn in
+    # _icons_sprite.html; see that file's own comment for the full list.
+    "School & University": [
+        "graduation-cap", "school", "backpack", "pencil", "ruler",
+        "calculator", "id-card", "chalkboard", "notebook", "atom",
+    ],
+    "Debate & Speech": [
+        "message-circle", "message-square", "megaphone", "podium", "gavel",
+        "trophy", "medal", "handshake", "quote", "scale",
+    ],
+    "Family & Celebrations": [
+        "cake", "balloon", "party-popper", "baby", "family-tree",
+        "candle", "confetti", "sparkles", "ribbon", "home-heart",
+    ],
 }
 
 LABEL_ICONS = [name for group in ICON_GROUPS.values() for name in group]

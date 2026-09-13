@@ -17,6 +17,36 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request: "a bigger library of icons that
+  fit the actual uses of the app," curated against the user's real label list
+  (University, Asociația de Dezbateri, Birthday, Creangă Debate, Debate,
+  Family, High School) -- none of these had anything more specific than
+  generic book/award/users glyphs to pick from. Added 30 hand-drawn icons
+  (24x24, stroke-width 2, round caps/joins, same spec as every other icon in
+  `templates/_icons_sprite.html`) across three new `ICON_GROUPS` categories
+  in `routers/labels.py`: "School & University" (graduation-cap, school,
+  backpack, pencil, ruler, calculator, id-card, chalkboard, notebook, atom),
+  "Debate & Speech" (message-circle, message-square, megaphone, podium,
+  gavel, trophy, medal, handshake, quote, scale), "Family & Celebrations"
+  (cake, balloon, party-popper, baby, family-tree, candle, confetti,
+  sparkles, ribbon, home-heart). Only message-circle/message-square have a
+  real Feather-set equivalent (reused as-is); everything else is original,
+  redrawn to match rather than pulled in as a dependency. `LABEL_ICONS`
+  derives from `ICON_GROUPS` automatically, so no other file needed
+  changes -- verified no id collisions with the existing ~140 symbols and
+  that every name in `ICON_GROUPS` resolves to a real sprite symbol
+  (regex cross-check, not just visual inspection).
+
+  **Tests**: full suite in 4 chunks (same reasoning as below -- this
+  sandbox's 45s per-bash-call ceiling), 2,219 passed, 0 failed
+  (`test_caldav_bridge_live.py` excluded as always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should open the icon
+  picker (label/habit edit modal) once deployed to confirm the 30 new
+  glyphs render as intended, especially the more complex ones (gavel,
+  trophy, family-tree).
+
 - **Shipped:** 2026-09-13 -- direct report: "the mobile-nav-drawer doesn't
   allow to be dragged down to close." (Same report also flagged two other
   mobile-touch issues, deliberately NOT built this slice per direct
