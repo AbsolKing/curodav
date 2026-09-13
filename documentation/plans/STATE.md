@@ -17,6 +17,52 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (8 of 9 in the same "before
+  v2.2.0 release" batch): "the Birthday label should be hidden, as well
+  for the habits one, because they are not intended to be applied by the
+  user directly." Asked a follow-up clarifying question (AskUserQuestion)
+  on scope, since two genuinely separate label lists exist -- "hide from
+  the apply-to-object picker only" vs. "hide everywhere, including
+  Settings > Labels" -- Peter chose the narrower option: stays visible/
+  editable in Settings > Labels (so it can still be recolored/re-iconed,
+  and the habit label can still be renamed there), only disappears from
+  every chip picker used to apply a label to a task/event/contact/note.
+
+  Traced both system labels to their source: "Birthday" is a hardcoded
+  literal (`db.py::sync_contact_birthday_event`'s `tags=["Birthday"]`,
+  auto-applied to the synthetic yearly birthday event every contact save
+  upserts). The habit marker has no fixed name at all --
+  `task_habit_settings.habit_label` (default `"Habit"`, user-renameable
+  in Settings) -- so the exclusion has to read the LIVE configured value,
+  not match a fixed string.
+
+  Every picker (`_task_form_fields.html` and its event/contact/note/habit
+  equivalents) funnels through one shared function,
+  `db.list_tag_names_in_use` -> `db.list_all_known_label_names` -- the
+  single right place to filter once instead of once per caller. Added a
+  case-insensitive exclusion set there: `{"birthday", <live habit_label,
+  lowercased>}`. Deliberately does NOT touch `db.list_labels` (the
+  Settings > Labels admin table) or `db.list_all_label_names` (used by
+  that table and by published-lists' own label filter) -- both still show
+  every label including these two, matching the chosen scope.
+
+  **Tests**: new `TestSystemLabelsExcludedFromThePicker` class in
+  `test_phase2_labels.py` (5 tests) -- confirms Birthday is excluded even
+  while in use (but still present in the unfiltered
+  `list_all_label_names`), case-insensitively; confirms the default
+  "Habit" is excluded; confirms a *renamed* habit label tracks the live
+  config (excludes the new name, stops excluding the old "Habit" string
+  once it's no longer configured); confirms ordinary labels are
+  unaffected. Ran the file alone first (51 passed), then full suite in
+  the same 12-chunk split as the entries above -- 2,227 passed (2,222 +
+  the 5 new tests), 0 failed (`test_caldav_bridge_live.py` excluded as
+  always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should confirm on a
+  real task/event/contact edit form that Birthday/Habit no longer appear
+  as addable chips, while Settings > Labels still lists both normally.
+
 - **Shipped:** 2026-09-13 -- direct request (7 of 9 in the same "before
   v2.2.0 release" batch): "contact images should be resource efficient
   (webp) -- I know they can be saved inline in the contacts thing [as

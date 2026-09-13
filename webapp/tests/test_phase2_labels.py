@@ -580,3 +580,45 @@ class TestLabelAbbreviation:
         spaces = db.list_space_labels(conn)
         assert [(s["name"], s["abbreviation"]) for s in spaces] == [("University", "Uni")]
 
+
+class TestSystemLabelsExcludedFromThePicker:
+    """2026-09-13 direct request: "the Birthday label should be hidden, as
+    well for the habits one, because they are not intended to be applied
+    by the user directly." Scoped (follow-up clarification) to the single
+    choke point every "apply a label to this object" chip picker goes
+    through -- db.list_tag_names_in_use (-> list_all_known_label_names) --
+    not db.list_labels (Settings > Labels, still shows everything) or
+    db.list_all_label_names (published-lists' own filter, also
+    unaffected)."""
+
+    def test_birthday_excluded_even_though_in_use(self, conn):
+        db.set_object_labels(conn, "event", "e1", ["Birthday"])
+        assert "Birthday" not in db.list_tag_names_in_use(conn)
+        # The underlying "every label ever applied" list is untouched --
+        # only the picker-facing function filters.
+        assert "Birthday" in db.list_all_label_names(conn)
+
+    def test_birthday_excluded_case_insensitively(self, conn):
+        db.set_object_labels(conn, "event", "e1", ["birthday"])
+        assert "birthday" not in db.list_tag_names_in_use(conn)
+
+    def test_default_habit_label_excluded(self, conn):
+        db.set_object_labels(conn, "task", "t1", ["Habit"])
+        assert "Habit" not in db.list_tag_names_in_use(conn)
+
+    def test_renamed_habit_label_is_excluded_not_the_old_default(self, conn):
+        # habit_label is user-renameable (Settings) -- the exclusion must
+        # track the LIVE configured value, not a hardcoded "Habit" string.
+        db.save_task_habit_settings(conn, "Routines")
+        db.set_object_labels(conn, "task", "t1", ["Routines", "Habit"])
+        names = db.list_tag_names_in_use(conn)
+        assert "Routines" not in names
+        # "Habit" is no longer the configured habit label, so a real
+        # object still tagged with it (e.g. before the rename) stays
+        # visible/pickable like any other ordinary label.
+        assert "Habit" in names
+
+    def test_ordinary_labels_unaffected(self, conn):
+        db.set_object_labels(conn, "task", "t1", ["Birthday", "Habit", "Focus"])
+        assert db.list_tag_names_in_use(conn) == ["Focus"]
+
