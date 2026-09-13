@@ -17,6 +17,43 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (1 of 9 in a "before v2.2.0
+  release" batch, user confirmed sequential one-slice-per-session handling
+  for the whole batch): "the agenda for projects should be updated to the
+  newest dashboard widget style (date as pills)." `project_detail.html`'s
+  Agenda card had its own older row shape (date as plain leading-cell text,
+  title second) predating `_widget_agenda.html`'s 2026-09-13 "date as a
+  pill, title first, date second, circle dot" row rework -- this slice
+  brings the project page's card in line with that same shape: task rows
+  now use `widget_complete_button` in the leading `widget-row-icon` cell
+  (was plain relative-date text) with the date moved to the right cell;
+  event rows use `widget_event_dot()` leading with the date+time as a
+  right-aligned blue pill (was leading-cell text, no pill); the synthetic
+  project-deadline row keeps its non-clickable shape but now carries a
+  flag leading icon and a single red pill combining "Deadline · <date>"
+  (previously a bare "Deadline" pill with the date sitting outside it as
+  plain leading text) -- one pill rather than two since `widget_link_row`
+  only has one `right` slot. No CSS or macro changes needed --
+  `.pill-static`/`.pill-blue`/`.widget-row-icon`/`widget_event_dot()` etc.
+  all already existed from `_widget_agenda.html`'s own pass; this was a
+  markup-only change to `project_detail.html` (imports `widget_complete_button`,
+  `widget_event_dot` alongside the macros it already imported).
+
+  **Tests**: `tests/test_project_detail.py` alone first (44 passed --
+  existing assertions only check `resp.context["agenda_items"]`, backend
+  data unaffected by a template change, plus a substring check for
+  "Deadline" in the rendered body, still true inside the combined pill),
+  then full suite in 12 chunks by test file (this sandbox's per-bash-call
+  45s ceiling doesn't tolerate even ~10-file chunks reliably, smaller than
+  the 4-chunk split earlier sessions used) -- 2,219 passed, 0 failed
+  (`test_caldav_bridge_live.py` excluded as always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should open a project
+  page with upcoming tasks/events/a deadline to confirm the pill layout
+  reads correctly, especially the combined "Deadline · <date>" pill text
+  wrapping at narrow widths.
+
 - **Shipped:** 2026-09-13 -- direct request: "a bigger library of icons that
   fit the actual uses of the app," curated against the user's real label list
   (University, Asociația de Dezbateri, Birthday, Creangă Debate, Debate,
