@@ -17,6 +17,50 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (6 of 9 in the same "before
+  v2.2.0 release" batch): "row-select should not persist between page
+  refresh!" Audited every place selection state could plausibly survive a
+  reload first -- no localStorage/sessionStorage/query-param/server-side
+  session use anywhere near row-select in `static/*.js`, `templates/`, or
+  `routers/*.py`; both selection implementations (`tasks_table.js`'s
+  bespoke one, `bulk_select.js`'s shared `CCBulkSelect` used by Holidays/
+  Time Blocks/Labels/Contacts) keep selection purely in an in-memory `Set`
+  that's always empty on a fresh script evaluation.
+
+  The real cause is outside app-level "persistence" entirely: browsers
+  (Chrome in particular) restore a `<input type="checkbox">`'s last
+  `.checked` value across a plain reload from DOM position alone,
+  independent of any app state and regardless of `<form>` wrapping. Left
+  alone this produces exactly the reported symptom -- a checkbox visually
+  checked after a refresh -- even though the underlying `selected` Set
+  (rebuilt empty every load) has no matching uid, no `.is-selected`
+  highlight, no bulk-actions bar. Two-part fix: `autocomplete="off"` added
+  to all six `.row-select` checkbox render sites
+  (`_task_row.html`, `_habit_row.html`, `_contacts_body.html`,
+  `labels_manage.html`, `settings_time_blocks.html`,
+  `settings_holidays.html`) to stop the browser attempting the
+  restoration at all; and, as a guaranteed fallback regardless of browser
+  behavior, both JS modules now force every `.row-select` checkbox back
+  to unchecked (and clear stray `.is-selected`) once at load --
+  `tasks_table.js` reuses its own existing `reconcileAfterSwap()` (already
+  did exactly this after an async region swap, just never called once at
+  initial page load before now); `bulk_select.js`'s `init()` does the
+  equivalent inline since it has no separate reconcile function.
+
+  **Tests**: `test_bulk_actions_tables.py` plus every table-view test file
+  the six edited templates touch (Tasks, Habits, Contacts, Labels, Time
+  Blocks, Holidays) first -- 190 passed, no exact-checkbox-markup test
+  existed to update (none asserted the full `<input ...>` string). Then
+  full suite in the same 12-chunk split as the entries above -- 2,220
+  passed, 0 failed (`test_caldav_bridge_live.py` excluded as always).
+
+  **Not live-verified**: this is a browser-behavior fix with no
+  JS/CSS test harness in this suite (recurring note in this file) to
+  simulate a real reload's form-state restoration -- Peter should select
+  a few rows on Tasks and on one `CCBulkSelect` page (e.g. Contacts or
+  Labels), refresh, and confirm every checkbox comes back unchecked with
+  no stale bulk bar.
+
 - **Shipped:** 2026-09-13 -- direct request (5 of 9 in the same "before
   v2.2.0 release" batch): "contact's avatar-circle avatar-large avatar
   should be colored in backgrounds like for Projects and Spaces avatars."

@@ -87,6 +87,27 @@
     function rowFor(cb) {
       return cb.closest(rowSelector);
     }
+
+    // 2026-09-13 (direct request: "row-select should not persist between
+    // page refresh") -- `selected` above is already a fresh, empty Set on
+    // every init() (this module keeps no localStorage/sessionStorage
+    // state anywhere). The actual bug was the browser's own form-control
+    // state restoration -- Chrome (and others) can re-apply a checkbox's
+    // last `.checked` value across a plain reload purely from DOM
+    // position, independent of any app-level persistence, regardless of
+    // `<form>` wrapping -- so a bfcache/reload-restored checkbox could
+    // show visually checked while `selected` (rebuilt empty) has no
+    // matching uid: no highlighted row, no bulk bar, a checkbox stuck
+    // showing a selection that no longer exists anywhere. Force every
+    // `.row-select` this instance owns back to unchecked (and drop any
+    // stray `.is-selected` from a prior render) right at init, same
+    // "selected Set is the sole source of truth" contract `setSelected`
+    // already keeps everywhere else in this file.
+    checkboxes().forEach((cb) => {
+      cb.checked = false;
+      const row = rowFor(cb);
+      if (row) row.classList.remove("is-selected");
+    });
     function setSelected(cb, on) {
       cb.checked = on;
       const row = rowFor(cb);
