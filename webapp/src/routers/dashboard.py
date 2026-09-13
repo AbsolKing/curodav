@@ -316,20 +316,28 @@ def _render_agenda(conn, config: dict, nav: dict | None = None) -> dict:
     direct feedback: "next 30 days range css should look like all
     upcoming" -- a 30-cell day-by-day grid was mostly empty boxes and
     harder to scan than a flat list); Next 30 days bounds Tasks/Events to
-    its own 30-day window, All upcoming leaves Tasks unbounded forward and
-    only windows Events for recurrence-expansion purposes (every future
-    event, unbounded -- upcoming_events' own semantics)."""
+    its own 30-day window, All upcoming bounds Tasks/Events to 364 days
+    out (2026-09-13 direct request: "widgets that don't have a time limit
+    -- the time limit shouldn't actually be infinite, it should always be
+    364 days into the future" -- previously Tasks were left with no upper
+    bound at all here, and Events were windowed to a 730-day recurrence-
+    expansion cap; both now share the same 364-day horizon as every other
+    "no limit" widget setting)."""
     show = _agenda_show(config)
     range_ = _agenda_range(config)
     today = date.today()
     today_iso = today.isoformat()
-    # `0` means "unlimited" (2026-08-31 direct feedback) -- `config.get
-    # ("limit")` can legitimately be the int `0` now (see _config_from_form,
-    # which already stores it verbatim), so this can't collapse falsy-0
-    # into the "not set" default the way `... or 10` used to; only an
-    # absent/None config value falls back to 10.
+    # `0` used to mean "unlimited"; 2026-09-13 direct request ("no limit
+    # should actually be 20 maximum items") caps it at 20 instead --
+    # `config.get("limit")` can legitimately be the int `0` (see
+    # _config_from_form, which stores it verbatim), so this can't collapse
+    # falsy-0 into the "not set" default the way `... or 10` used to; only
+    # an absent/None config value falls back to the real default of 10,
+    # while an explicit `0` now maps to the 20-item cap.
     _raw_limit = config.get("limit")
     limit = int(_raw_limit) if _raw_limit is not None else 10
+    if not limit:
+        limit = 20
 
     overdue_tasks: list[dict] = []
     if "overdue" in show:
@@ -371,13 +379,12 @@ def _render_agenda(conn, config: dict, nav: dict | None = None) -> dict:
 
     # next_30_days / all_upcoming -- same flat-list shape; only the window
     # each bounds Tasks/Events to differs (see this function's own
-    # docstring).
-    task_end_iso = None if range_ == "all_upcoming" else (today + timedelta(days=29)).isoformat()
-    # A window end far enough out that even a yearly-recurring event still
-    # produces its next occurrence (same generous cap
-    # `_is_long_lived_recurrence` above uses for the same reason) --
-    # Next 30 days windows Events to its own real 30-day span instead.
-    event_window_end = (today + timedelta(days=730)) if range_ == "all_upcoming" else (today + timedelta(days=29))
+    # docstring). All upcoming's horizon is 364 days out, not unbounded
+    # (2026-09-13 direct request, see docstring) -- was `None` (literally
+    # no upper bound) for Tasks and a 730-day recurrence-expansion cap for
+    # Events; both now share the same 364-day window.
+    task_end_iso = (today + timedelta(days=364)).isoformat() if range_ == "all_upcoming" else (today + timedelta(days=29)).isoformat()
+    event_window_end = (today + timedelta(days=364)) if range_ == "all_upcoming" else (today + timedelta(days=29))
 
     tasks = []
     if "tasks" in show:
@@ -423,7 +430,23 @@ def _render_agenda(conn, config: dict, nav: dict | None = None) -> dict:
         # relying on list_events' own start param alone) is still needed
         # for the *next_30_days*/*all_upcoming* window's forward edge, just
         # no longer wall-clock-precise about it.
-        events = [e for e in _filtered_events_expanded(conn, config, today, event_window_end) if e.get("start_at") and e["start_at"][:10] >= today_iso]
+        #
+        # 2026-09-13: added the `<= event_window_end` upper-bound check --
+        # `_filtered_events_expanded`/`expand_events` (recurrence_expand.py,
+        # own docstring: "Non-recurring rows pass through unchanged") only
+        # ever uses `event_window_end` to bound a RECURRING row's expanded
+        # occurrences; a plain non-recurring event is fetched and passed
+        # through regardless of the window, so this filter had no real
+        # upper edge at all before (an event dated a decade out already
+        # showed up in "Next 30 days"). Needed now so the All upcoming
+        # window's new 364-day horizon (see docstring, direct request:
+        # "the time limit shouldn't actually be infinite, it should always
+        # be 364 days into the future") actually bounds anything.
+        event_window_end_iso = event_window_end.isoformat()
+        events = [
+            e for e in _filtered_events_expanded(conn, config, today, event_window_end)
+            if e.get("start_at") and today_iso <= e["start_at"][:10] <= event_window_end_iso
+        ]
         events.sort(key=lambda e: e.get("start_at") or "")
         if limit:
             events = events[:limit]
@@ -832,12 +855,18 @@ def _render_contact_list(conn, config: dict, nav: dict | None = None) -> dict:
             c for c in contacts
             if any(tag.lower() in tags_lower for tag in (c.get("tags") or []))
         ]
-    # `0` means "unlimited" -- see _render_agenda's own comment on the same
-    # `config.get("limit")` pattern for why `... or 20` can't be used here
-    # any more now that `0` is a legitimate stored value, not "unset".
+    # `0` used to mean "unlimited"; 2026-09-13 direct request ("no limit
+    # should actually be 20 maximum items") caps it at 20 instead -- see
+    # _render_agenda's own comment on the same `config.get("limit")`
+    # pattern for why `... or 20` can't be used here any more now that `0`
+    # is a legitimate stored value, not "unset" (an absent/None config
+    # value falls back to the real default of 20, same as an explicit `0`
+    # now does too).
     _raw_limit = config.get("limit")
     limit = int(_raw_limit) if _raw_limit is not None else 20
-    return {"contacts": contacts[:limit] if limit else contacts}
+    if not limit:
+        limit = 20
+    return {"contacts": contacts[:limit]}
 
 
 def _render_habit_checkin(conn, config: dict, nav: dict | None = None) -> dict:

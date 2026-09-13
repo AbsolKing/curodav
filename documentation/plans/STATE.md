@@ -17,6 +17,58 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (3 of 9 in the same "before
+  v2.2.0 release" batch): "widgets that don't have a time limit -- the
+  time limit shouldn't actually be infinite, it should always be 364 days
+  into the future. Also no limit should actually be 20 maximum items."
+  Only two widget types have either of these "unlimited" knobs (`agenda`,
+  `contact_list` in `routers/dashboard.py`'s `WIDGET_VIEWS`
+  `has_limit` set) -- confirmed via grep, no other widget type reads
+  `config["limit"]` or has a range concept.
+
+  Item count: `_render_agenda`/`_render_contact_list` used to treat a
+  stored `limit == 0` as "don't slice at all." Both now clamp `0` (or a
+  falsy value) to `20` right after resolving it, before any slicing
+  happens -- one `if not limit: limit = 20` each, rather than restructuring
+  the slice calls themselves. Two `_widget_*.html` templates' "0 =
+  unlimited" field-hints updated to "0 = up to 20" to match (the `limit`
+  input/stepper/min=0 markup itself is unchanged, just the label).
+
+  Date horizon: `_render_agenda`'s All upcoming range used to leave Tasks
+  with literally no upper bound (`task_end_iso = None`) and window Events
+  to a 730-day recurrence-expansion cap that, it turned out, was never
+  actually being enforced as a display bound in the first place (see
+  below) -- both now resolve to `today + 364 days`, matching Next 30
+  days' own shape (window end computed once, used for both Tasks and
+  Events) instead of the two having different semantics.
+
+  Found and fixed a related pre-existing bug while doing this: the Events
+  filter only ever checked `start_at >= today_iso` (a lower bound), never
+  an upper one, because `recurrence_expand.expand_events`'s own docstring
+  says "non-recurring rows pass through unchanged" -- `event_window_end`
+  only ever bounded a RECURRING row's expanded occurrences, so a plain
+  one-off event dated arbitrarily far in the future already leaked into
+  both Next 30 days and All upcoming with no real ceiling at all. Added
+  the missing `<= event_window_end` check to that same filter line --
+  without it, the new 364-day All upcoming horizon wouldn't have bounded
+  anything (caught by a new test seeding a 400-days-out event, which
+  still came back before this fix).
+
+  **Tests**: `test_dashboard_router.py` alone first (140 passed) -- both
+  existing `test_limit_zero_means_unlimited` tests renamed/rewritten to
+  assert a 20-item cap (25 seeded, 20 returned) instead of "returns
+  everything," and a new `test_all_upcoming_range_bounds_to_364_days_out`
+  added (360-days-out event included, 400-days-out excluded) which is
+  what surfaced the pre-existing Events-upper-bound bug above. Then full
+  suite in the same 12-chunk split as the two entries above -- 2,220
+  passed (2,219 + the one new test), 0 failed (`test_caldav_bridge_live.py`
+  excluded as always).
+
+  **Not visually verified**: the two field-hint label changes ("0 = up to
+  20") weren't screenshotted -- same sandbox-can't-reach-a-real-browser
+  limitation as elsewhere in this file, low risk since it's a one-line
+  text change in an already-tested template region.
+
 - **Shipped:** 2026-09-13 -- direct request (2 of 9 in the same "before
   v2.2.0 release" batch as the entry below): "the kanban board should
   allow for easier drag and drop (drag a card from any point, drop
