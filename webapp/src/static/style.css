@@ -3022,7 +3022,7 @@ main.main-calendar > .page-header-narrow{flex:none;}
    aside -- that aside stays flex:none below, the grid card claims the
    remainder). */
 main.main-calendar > .calendar-viewport,
-main.main-calendar > .project-calendar-layout{flex:1 1 auto; min-height:0; margin-bottom:8dvh;}
+main.main-calendar > .project-calendar-layout{flex:1 1 auto; min-height:0;}
 /* The widget itself: a flex column so a Week/Day time grid can pin its
    header (below) while scrolling the hours, and a scroll container in
    its own right so Month/4-Week (no further internal flex target) also
@@ -3079,6 +3079,14 @@ main.main-calendar .month-week-grid{flex:1 1 0;}
      tracks the real, current visual viewport rather than the largest
      possible one, same reasoning as the mobile block below. */
   main.main-calendar{height:100vh; height:100dvh;}
+}
+@media (max-width:720px){
+  /* This margin-bottom only exists to keep the grid's own content clear
+     of the mobile bottom nav bar (.mobile-tabbar, 64px, fixed/persistent
+     below this breakpoint) -- desktop has no such bar, so the block above
+     leaves it out entirely instead of setting it to 0 here. */
+  main.main-calendar > .calendar-viewport,
+  main.main-calendar > .project-calendar-layout{margin-bottom:8dvh;}
 }
 
 /* Week/Day time grid (routers/calendar.py week_view/day_view, grid_layout.py) */
