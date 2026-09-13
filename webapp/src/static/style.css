@@ -2673,6 +2673,19 @@ tr:hover .task-row-delete, tr:focus-within .task-row-delete{opacity:1;}
 }
 .avatar-large{width:52px; height:52px; font-size:20px;}
 img.avatar-circle{object-fit:cover;}
+/* 2026-09-13 (direct request: "contact's avatar-circle avatar-large
+   avatar should be colored in backgrounds like for Projects and Spaces
+   avatars") -- deps.py's avatar() global now adds this class (alongside
+   `--tile-swatch`, same CSS var name/palette `.label-icon-tile` already
+   uses for the Projects/Spaces icon tile, see this file's own comment on
+   that rule) only to the no-photo initials-fallback `<span>`; a real
+   photo `<img class="avatar-circle">` never gets this class, so it's
+   unaffected. Stays a circle (`.avatar-circle`'s own 50% radius), unlike
+   `.label-icon-tile`'s squircle -- the request was for color, not shape.
+   White text reads on every one of the 16 `--cal-bg-*` swatches, unlike
+   the plain-gray fallback's `--fg-primary` (a light/dark theme text
+   color chosen to sit on a neutral background, not a saturated one). */
+.avatar-circle.avatar-colored{background:var(--tile-swatch, var(--accent-neutral-subtle)); color:#fff;}
 .contact-quick-actions{display:flex; gap:8px; margin-bottom:14px;}
 
 /* Photo upload field (contact_form.html) -- avatar (real photo or initials

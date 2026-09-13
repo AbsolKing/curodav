@@ -17,6 +17,54 @@ session start.
 
 ## Right now
 
+- **Shipped:** 2026-09-13 -- direct request (5 of 9 in the same "before
+  v2.2.0 release" batch): "contact's avatar-circle avatar-large avatar
+  should be colored in backgrounds like for Projects and Spaces avatars."
+  Projects/Spaces get their color from `label_config.color`, applied via
+  `_page_banner.html`'s `.label-icon-tile` (`--tile-swatch:var(--cal-bg-
+  {color})`). Contacts have no color field of their own -- reused
+  `deps.py`'s existing `stable_color()` (a name/uid -> one-of-16-palette-
+  names MD5 hash, already used for this same contact's detail-cover accent,
+  `contact_detail.html:50`) instead of adding a real color field/picker.
+
+  `deps.py::_avatar()` (the one shared global every avatar-circle render
+  site goes through) now seeds `stable_color(contact.get("uid") or
+  contact.get("full_name") or "?")` for the no-photo initials-fallback
+  `<span>` only -- a real photo `<img class="avatar-circle">` is untouched,
+  it doesn't need a color fill. Adds a new `avatar-colored` class plus
+  inline `--tile-swatch:var(--cal-bg-{name}, var(--cal-bg-blue))` to that
+  span; new CSS rule `.avatar-circle.avatar-colored{background:var(--tile-
+  swatch, ...); color:#fff;}` in style.css. Stays a circle (`.avatar-
+  circle`'s own 50% radius) -- the request was for color, not
+  `.label-icon-tile`'s squircle shape. The `uid`-less fallback (`full_name`)
+  covers the two call sites that pass a plain profile-photo dict with no
+  `uid` at all (`_page_banner.html`'s Home-header avatar,
+  `settings_your_profile.html`'s own avatar row) -- both also now get a
+  colored initials fallback for free, not just contacts proper, since
+  they share the exact same `_avatar()` global.
+
+  **Tests**: three pre-existing tests asserted the old exact two-class
+  markup (`class="avatar-circle avatar-hero"` / `avatar-large"`, no
+  `avatar-colored`) and needed updating to substring/piecewise assertions
+  instead of hardcoding a specific `stable_color()`-derived color name
+  (`test_banners.py`'s `test_home_shows_avatar_initial_fallback_with_a_
+  banner`, `test_home_avatar_uses_display_name_initial`,
+  `test_home_still_shows_the_profile_avatar`; `test_detail_modals_
+  rework.py`'s `test_contact_header_shows_avatar_and_org`). Ran the four
+  affected files plus every contacts-field-parity file first (373 passed
+  combined), then full suite in the same 12-chunk split as the entries
+  above -- 2,220 passed, 0 failed (`test_caldav_bridge_live.py` excluded
+  as always).
+
+  **Not visually verified**: same sandbox-can't-reach-a-real-browser
+  limitation noted elsewhere in this file -- Peter should open the
+  Contacts list/detail/edit-form and Settings > Your profile to confirm
+  the colored initials fallback reads well against both themes, and that
+  white text has enough contrast on every one of the 16 `--cal-bg-*`
+  swatches (`--tile-swatch`'s fallback chain assumes it does, same
+  assumption `.label-icon-tile` already makes for Projects/Spaces, but
+  never independently re-verified here).
+
 - **Verified, no change needed:** 2026-09-13 -- direct request (4 of 9 in
   the same "before v2.2.0 release" batch): "contacts should be able to be
   created and edited even without a birthday attached to it." Already
