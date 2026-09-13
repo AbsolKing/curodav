@@ -58,6 +58,11 @@ else
 fi
 
 tunnel_id() {
+  # cloudflared's JSON returns deleted_at as the Go zero-value timestamp
+  # ("0001-01-01T00:00:00Z"), not null/absent, for tunnels that are NOT
+  # deleted -- a plain truthiness check on deleted_at treats every tunnel
+  # as deleted and always returns empty, causing 'tunnel create' to be
+  # (wrongly) retried against a name that already exists.
   cloudflared tunnel list -o json 2>/dev/null | python3 -c "
 import json, sys
 name = sys.argv[1]
@@ -66,7 +71,9 @@ try:
 except json.JSONDecodeError:
     sys.exit(0)
 for t in tunnels:
-    if t.get('name') == name and not t.get('deleted_at'):
+    deleted_at = t.get('deleted_at') or ''
+    is_deleted = bool(deleted_at) and not deleted_at.startswith('0001-01-01')
+    if t.get('name') == name and not is_deleted:
         print(t['id'])
         break
 " "$TUNNEL_NAME"
