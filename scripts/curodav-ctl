@@ -660,7 +660,16 @@ cmd_update() {
 
   local tmp_clone
   tmp_clone="$(mktemp -d)"
-  trap 'rm -rf "$tmp_clone"' RETURN
+  # RETURN traps are NOT function-scoped in bash -- once set, they keep
+  # firing on every later function return for the rest of the script, not
+  # just this function's own. tmp_clone is `local`, so the next function
+  # to return after this one (e.g. cmd_install's own log/self_install
+  # calls when cmd_update runs as a sub-step of `install`) would re-fire
+  # this trap against an out-of-scope variable and die with "unbound
+  # variable" under `set -u`. Clearing the trap as its own first action
+  # fixes that: it still cleans up tmp_clone on this function's return,
+  # but never fires again afterward.
+  trap 'rm -rf "$tmp_clone"; trap - RETURN' RETURN
 
   log "Cloning ${repo_url} (${GIT_BRANCH})..."
   git clone --depth 1 --branch "$GIT_BRANCH" "$repo_url" "$tmp_clone"
