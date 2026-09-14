@@ -24,6 +24,7 @@ services:
       CC_RADICALE_USER: curodav
       CC_RADICALE_PASSWORD: changeme
       CC_DEPLOY_MODE: production
+      CC_DB_PATH: /app/data/cache.sqlite
     volumes:
       - curodav-data:/app/data
     depends_on:
